@@ -1,3 +1,6 @@
 [submodule "cmake"]
 	path = cmake
 	url = https://github.com/nbaiot/third_cmake.git
+[submodule "third/json"]
+	path = third/json
+	url = https://github.com/nlohmann/json.git
