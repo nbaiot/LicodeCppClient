@@ -5,6 +5,7 @@
 #ifndef LICODECPPCLIENT_HTTP_SESSION_H
 #define LICODECPPCLIENT_HTTP_SESSION_H
 
+#include <any>
 #include <memory>
 #include <string>
 #include <cstdint>
@@ -13,6 +14,11 @@
 #include <boost/asio/io_context.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/beast/core/tcp_stream.hpp>
+
+#include <glog/logging.h>
+
+#include "http_request.h"
+#include "http_response.h"
 
 namespace nbaiot {
 
@@ -25,17 +31,8 @@ public:
 
   ~HttpSession();
 
-  void Connect(const std::string& host, int16_t port, int32_t timeoutMS, OnConnectCallback callback);
-
-  void SendData(const std::string& data);
-
-private:
-  void OnResolve(int32_t timeoutMS, OnConnectCallback callback,
-                 boost::beast::error_code ec,
-                 const boost::asio::ip::tcp::resolver::results_type& results);
-
-  void OnConnect(OnConnectCallback callback,
-                 boost::beast::error_code ec, boost::asio::ip::tcp::resolver::results_type::endpoint_type ep);
+  std::shared_ptr<HttpResponse<StringHttpBody, StringHttpBody>>
+  Post(const std::shared_ptr<HttpRequest<StringHttpBody>>& request);
 
 private:
   boost::asio::ip::tcp::resolver resolver_;
