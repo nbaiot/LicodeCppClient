@@ -88,7 +88,7 @@ public:
     return this;
   }
 
-  HttpBody& Body() {
+  typename HttpBody::value_type& Body() {
     return request_.body();
   }
 
@@ -124,6 +124,10 @@ public:
 
   boost::beast::http::request<HttpBody>& Request() {
     return request_;
+  }
+
+  void PreparePayload() {
+    request_.prepare_payload();
   }
 
 private:

@@ -13,13 +13,15 @@ include(cmake/external/gflags.cmake)
 include(cmake/external/glog.cmake)
 include(cmake/external/boost.cmake)
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third/json/single_include)
 
 aux_source_directory(messenger MESSENGER_SRCS)
 aux_source_directory(thread THREAD_SRCS)
+aux_source_directory(core CORE_SRCS)
 
 add_executable(LicodeCppClient
-        ${MESSENGER_SRCS} ${THREAD_SRCS}
+        ${MESSENGER_SRCS} ${THREAD_SRCS} ${CORE_SRCS}
         main.cpp)
 
 target_link_libraries(LicodeCppClient glog gflags pthread)
