@@ -1,5 +1,5 @@
 //
-// Created by cuangenglei-os@360os.com on 2020/9/24.
+// Created by nbaiot@126.com on 2020/9/24.
 //
 
 #ifndef LICODECPPCLIENT_LICODE_TOKEN_CREATOR_H

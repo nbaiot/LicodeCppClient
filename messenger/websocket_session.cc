@@ -50,6 +50,8 @@ void WebsocketSession::Disconnect() {
 }
 
 void WebsocketSession::SendMsg(const std::string& msg) {
+  if (!IsConnected())
+    return;
   auto ss = std::make_shared<std::string const>(msg);
   boost::asio::post(
       ws_.get_executor(),
@@ -132,8 +134,6 @@ void WebsocketSession::OnRead(const boost::beast::error_code& ec, std::size_t by
   }
 
   auto msg = boost::beast::buffers_to_string(buffer_.data());
-  LOG(INFO) << ">>>>> receive msg:\n"
-            << msg;
   if (receive_msg_callback_) {
     receive_msg_callback_(msg);
   }
@@ -207,6 +207,7 @@ bool WebsocketSession::ParseUrl() {
 }
 
 void WebsocketSession::SetOnReadyCallback(WebsocketSession::OnReadyCallback callback) {
+  connected_ = true;
   ready_callback_ = std::move(callback);
 }
 
@@ -215,6 +216,7 @@ void WebsocketSession::SetOnReceiveMsgCallback(WebsocketSession::OnReceiveMsgCal
 }
 
 void WebsocketSession::SetOnAbnormalDisconnectCallback(WebsocketSession::OnAbnormalDisconnectCallback callback) {
+  connected_ = false;
   abnormal_disconnect_callback_ = std::move(callback);
 }
 
@@ -258,13 +260,12 @@ void WebsocketSession::DoClose() {
 void WebsocketSession::ProcessDisconnect(const std::string& reason) {
   if (!do_disconnect_ && abnormal_disconnect_callback_) {
     LOG(ERROR) << ">>>>>>>>>> WebsocketSession error:" << reason;
-    connected_ = false;
     abnormal_disconnect_callback_(reason);
   }
 }
 
 bool WebsocketSession::IsConnected() {
-  return false;
+  return connected_;
 }
 
 }

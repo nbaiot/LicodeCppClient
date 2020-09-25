@@ -1,5 +1,5 @@
 //
-// Created by cuangenglei-os@360os.com on 2020/9/24.
+// Created by nbaiot@126.com on 2020/9/24.
 //
 
 #ifndef LICODECPPCLIENT_LICODE_TOKEN_H
@@ -14,6 +14,17 @@ struct LicodeToken {
   std::string host;
   bool secure;
   std::string signature;
+
+  bool operator==(const LicodeToken& rhs) const {
+    return tokenId == rhs.tokenId &&
+           host == rhs.host &&
+           secure == rhs.secure &&
+           signature == rhs.signature;
+  }
+
+  bool operator!=(const LicodeToken& rhs) const {
+    return !(rhs == *this);
+  }
 
   bool Isvalid() {
     return !tokenId.empty() && !host.empty() && !signature.empty();

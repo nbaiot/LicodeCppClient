@@ -1,5 +1,5 @@
 //
-// Created by cuangenglei-os@360os.com on 2020/9/24.
+// Created by nbaiot@126.com on 2020/9/24.
 //
 
 #include "licode_token_creator.h"
@@ -148,6 +148,7 @@ LicodeToken LicodeTokenCreator::SyncCreate(const std::string& url, int timeoutMS
   body["mediaConfiguration"] = false;
   body["room"] = false;
   body["type"] = false;
+  /// TODO: fixme
   body["username"] = "jack";
   body["role"] = "presenter";
   request->Body() = body.dump();
