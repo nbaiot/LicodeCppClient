@@ -5,12 +5,14 @@
 #include "websocket_session.h"
 
 #include <glog/logging.h>
-#include <boost/asio/strand.hpp>
+#include <boost/asio/post.hpp>
+#include <boost/beast/core/buffers_to_string.hpp>
 
 namespace nbaiot {
 
 WebsocketSession::WebsocketSession(std::string url)
-    : url_(std::move(url)), work_guard_(ioc_.get_executor()), resolver_(ioc_), ws_(ioc_) {
+    : url_(std::move(url)), port_(-1), do_disconnect_(false), connected_(false),
+      work_guard_(ioc_.get_executor()), resolver_(ioc_), ws_(ioc_) {
   thread_ = std::make_unique<std::thread>([this]() {
       ioc_.run();
   });
@@ -26,28 +28,43 @@ WebsocketSession::~WebsocketSession() {
     ioc_.stop();
     thread_->join();
   }
+
+  if (ws_.is_open()) {
+    ws_.close("close websocket");
+  }
 }
 
 void WebsocketSession::Connect() {
+  if (connected_)
+    return;
+  do_disconnect_ = false;
+  connected_ = false;
   resolver_.async_resolve(host_, std::to_string(port_),
                           boost::beast::bind_front_handler(&WebsocketSession::OnResolve, shared_from_this()));
 }
 
 void WebsocketSession::Disconnect() {
-
+  do_disconnect_ = true;
+  boost::asio::post(ws_.get_executor(),
+                    boost::beast::bind_front_handler(&WebsocketSession::DoClose, shared_from_this()));
 }
 
 void WebsocketSession::SendMsg(const std::string& msg) {
-
+  auto ss = std::make_shared<std::string const>(msg);
+  boost::asio::post(
+      ws_.get_executor(),
+      boost::beast::bind_front_handler(
+          &WebsocketSession::OnSend,
+          shared_from_this(),
+          ss));
 }
 
 void WebsocketSession::OnResolve(boost::beast::error_code ec,
                                  const boost::asio::ip::tcp::resolver::results_type& results) {
   if (ec) {
-    LOG(ERROR) << "WebsocketSession resolve error:" << ec.message();
+    ProcessDisconnect(ec.message());
     return;
   }
-  LOG(INFO) << ">>>>>>>>> resolve success";
   boost::beast::get_lowest_layer(ws_).expires_after(std::chrono::seconds(5));
   boost::beast::get_lowest_layer(ws_).async_connect(
       results,
@@ -60,10 +77,10 @@ void WebsocketSession::OnResolve(boost::beast::error_code ec,
 void WebsocketSession::OnConnect(boost::beast::error_code ec,
                                  const boost::asio::ip::tcp::resolver::results_type::endpoint_type& e) {
   if (ec) {
-    LOG(INFO) << ">>>>>>>>> connect error:" << ec.message();
+    ProcessDisconnect(ec.message());
     return;
   }
-  LOG(INFO) << ">>>>>>>>> connect success";
+
   boost::beast::get_lowest_layer(ws_).expires_never();
 
   ws_.set_option(
@@ -77,7 +94,6 @@ void WebsocketSession::OnConnect(boost::beast::error_code ec,
                   " websocket-client-async");
       }));
 
-  // Perform the websocket handshake
   auto host = host_ + ":" + std::to_string(port_);
   ws_.async_handshake(host, target_,
                       boost::beast::bind_front_handler(
@@ -87,10 +103,43 @@ void WebsocketSession::OnConnect(boost::beast::error_code ec,
 
 void WebsocketSession::OnHandshake(const boost::beast::error_code& ec) {
   if (ec) {
-    LOG(INFO) << ">>>>>>>>> handshake error:" << ec.message();
+    ProcessDisconnect(ec.message());
     return;
   }
-  LOG(INFO) << ">>>>>>>>> handshake success:" << ec.message();
+
+  connected_ = true;
+
+  if (ready_callback_) {
+    ready_callback_();
+  }
+
+  DoRead();
+}
+
+void WebsocketSession::DoRead() {
+  ws_.async_read(
+      buffer_,
+      boost::beast::bind_front_handler(
+          &WebsocketSession::OnRead,
+          shared_from_this()));
+}
+
+
+void WebsocketSession::OnRead(const boost::beast::error_code& ec, std::size_t bytes_transferred) {
+  if (ec) {
+    ProcessDisconnect(ec.message());
+    return;
+  }
+
+  auto msg = boost::beast::buffers_to_string(buffer_.data());
+  LOG(INFO) << ">>>>> receive msg:\n"
+            << msg;
+  if (receive_msg_callback_) {
+    receive_msg_callback_(msg);
+  }
+  buffer_.consume(buffer_.size());
+
+  DoRead();
 }
 
 bool WebsocketSession::ParseUrl() {
@@ -116,7 +165,7 @@ bool WebsocketSession::ParseUrl() {
   /// host + (target + params)
   auto pathStart = scheme_.size() + 3;
   auto pathEnd = url_.size();
-  auto hostPath =  url_.substr(pathStart, pathEnd - pathStart);
+  auto hostPath = url_.substr(pathStart, pathEnd - pathStart);
 
   if (hostPath.empty()) {
     LOG(ERROR) << "unexpected url:" << url_;
@@ -130,7 +179,7 @@ bool WebsocketSession::ParseUrl() {
   if (portStart == std::string::npos) {
     /// default port
     port_ = 8080;
-    if (pathStart ==  std::string::npos) {
+    if (pathStart == std::string::npos) {
       host_ = hostPath;
     } else {
       host_ = hostPath.substr(0, pathStart);
@@ -155,6 +204,67 @@ bool WebsocketSession::ParseUrl() {
   target_ = hostPath.substr(pathStart + 1);
   target_ = "/" + target_;
   return true;
+}
+
+void WebsocketSession::SetOnReadyCallback(WebsocketSession::OnReadyCallback callback) {
+  ready_callback_ = std::move(callback);
+}
+
+void WebsocketSession::SetOnReceiveMsgCallback(WebsocketSession::OnReceiveMsgCallback callback) {
+  receive_msg_callback_ = std::move(callback);
+}
+
+void WebsocketSession::SetOnAbnormalDisconnectCallback(WebsocketSession::OnAbnormalDisconnectCallback callback) {
+  abnormal_disconnect_callback_ = std::move(callback);
+}
+
+
+void WebsocketSession::OnSend(const std::shared_ptr<std::string const>& msg) {
+  queue_.push_back(msg);
+
+  if (queue_.size() > 1)
+    return;
+
+  ws_.async_write(
+      boost::asio::buffer(*queue_.front()),
+      boost::beast::bind_front_handler(
+          &WebsocketSession::OnWrite,
+          shared_from_this()));
+}
+
+void WebsocketSession::OnWrite(const boost::beast::error_code& ec, std::size_t) {
+  if (ec) {
+    LOG(ERROR) << ">>>>>>>>>> WebsocketSession write error:" << ec.message();
+    return;
+  }
+
+  queue_.erase(queue_.begin());
+
+  if (!queue_.empty()) {
+    ws_.async_write(
+        boost::asio::buffer(*queue_.front()),
+        boost::beast::bind_front_handler(
+            &WebsocketSession::OnWrite,
+            shared_from_this()));
+  }
+}
+
+void WebsocketSession::DoClose() {
+  if (ws_.is_open()) {
+    ws_.close("close websocket");
+  }
+}
+
+void WebsocketSession::ProcessDisconnect(const std::string& reason) {
+  if (!do_disconnect_ && abnormal_disconnect_callback_) {
+    LOG(ERROR) << ">>>>>>>>>> WebsocketSession error:" << reason;
+    connected_ = false;
+    abnormal_disconnect_callback_(reason);
+  }
+}
+
+bool WebsocketSession::IsConnected() {
+  return false;
 }
 
 }
