@@ -20,7 +20,7 @@ class WebsocketSession;
 class LicodeSignaling : public std::enable_shared_from_this<LicodeSignaling> {
 
 public:
-  using OnSignalingReadyCallback = std::function<void()>;
+  using OnSignalingReadyCallback = std::function<void(bool, const std::string&)>;
 
   using OnSignalingDisconnectCallback = std::function<void()>;
 
@@ -40,10 +40,12 @@ public:
 
   void SetOnSignalingReadyCallback(OnSignalingReadyCallback callback);
 
+  void SetOnSignalingDisconnectCallback(OnSignalingDisconnectCallback callback);
+
   State CurrentState();
 
 private:
-  void Token(bool singlePC = false);
+  void InitToken(bool singlePC = false);
 
   void UpdateState(State state);
 
@@ -57,7 +59,13 @@ private:
 
   bool SocketIoPing();
 
-  void ReceivePong();
+  void ProcessSocketIOOpen(const std::string& msg);
+
+  void ProcessInitTokenResponse(const std::string& msg);
+
+  void ProcessDisconnect();
+
+  void ProcessPong();
 
 private:
   State state_;

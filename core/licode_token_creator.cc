@@ -136,7 +136,7 @@ private:
   std::unique_ptr<std::thread> thread_;
 };
 
-LicodeToken LicodeTokenCreator::SyncCreate(const std::string& url, int timeoutMS) {
+LicodeToken LicodeTokenCreator::SyncCreate(const std::string& url, const std::string& userName, int timeoutMS) {
   auto http = std::make_shared<SimpleHttpSession>();
   auto request = std::make_shared<HttpRequest<StringHttpBody>>();
   request->SetUrl(url);
@@ -146,10 +146,9 @@ LicodeToken LicodeTokenCreator::SyncCreate(const std::string& url, int timeoutMS
   request->AddHeader("Content-Type", "application/json");
   nlohmann::json body;
   body["mediaConfiguration"] = false;
-  body["room"] = false;
-  body["type"] = false;
-  /// TODO: fixme
-  body["username"] = "jack";
+  body["room"] = "basicExampleRoom";
+  body["type"] = "erizo";
+  body["username"] = userName;
   body["role"] = "presenter";
   request->Body() = body.dump();
   request->PreparePayload();

@@ -1,30 +1,41 @@
-#include <iostream>
+#include <mutex>
 #include <thread>
+#include <iostream>
+#include <condition_variable>
+
 #include <glog/logging.h>
-#include "core/licode_token_creator.h"
-#include <nlohmann/json.hpp>
-#include <boost/asio/io_context.hpp>
 
 #include "thread/thread_pool.h"
 #include "core/licode_signaling.h"
+#include "core/licode_token_creator.h"
 #include "messenger/websocket_session.h"
 
 using namespace nbaiot;
 
 int main() {
-  std::cout << "Hello, World!" << std::endl;
-  boost::asio::io_context ioc;
-  boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard{ioc.get_executor()};
+  LOG(INFO) << "Hello licode !!!" << std::endl;
 
-  auto tokenCreator = std::make_shared<LicodeTokenCreator>();
-  auto token = tokenCreator->SyncCreate("http://106.53.67.18:3001/createToken/", 3000);
   auto pool = std::make_shared<ThreadPool>(1);
   pool->Start();
 
+  auto token = LicodeTokenCreator::SyncCreate("http://106.53.67.18:3001/createToken/",
+                                              "jack",
+                                              3000);
+
+  if (!token.Isvalid()) {
+    LOG(ERROR) << ">>>>>> create token failed";
+    return -1;
+  }
+
   auto signaling = std::make_shared<LicodeSignaling>(pool->GetLessUsedWorker());
+  signaling->SetOnSignalingReadyCallback([](bool success, const std::string& reason) {
+    LOG(INFO) << ">>>>>>>>>> Licode Signaling init success!!!";
+  });
   signaling->Init(token);
 
-
-  ioc.run();
+  std::mutex mutex;
+  std::unique_lock<std::mutex> lk(mutex);
+  std::condition_variable cv;
+  cv.wait(lk);
   return 0;
 }

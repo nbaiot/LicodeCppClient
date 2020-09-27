@@ -11,7 +11,7 @@ namespace nbaiot {
 
 class LicodeTokenCreator {
 public:
-  LicodeToken SyncCreate(const std::string& url, int timeoutMS);
+  static LicodeToken SyncCreate(const std::string& url, const std::string& userName, int timeoutMS);
 };
 
 }
