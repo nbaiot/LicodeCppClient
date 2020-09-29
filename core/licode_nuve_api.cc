@@ -2,7 +2,7 @@
 // Created by nbaiot@126.com on 2020/9/24.
 //
 
-#include "licode_token_creator.h"
+#include "licode_nuve_api.h"
 
 #include <memory>
 #include <thread>
@@ -44,7 +44,7 @@ public:
   }
 
   boost::beast::http::response<StringHttpBody>
-      SyncPost(std::shared_ptr<HttpRequest<StringHttpBody>> request, int timeoutMS) {
+  SyncPost(std::shared_ptr<HttpRequest<StringHttpBody>> request, int timeoutMS) {
     response_.clear();
     request_ = std::move(request);
     timeoutMS_ = timeoutMS;
@@ -136,7 +136,13 @@ private:
   std::unique_ptr<std::thread> thread_;
 };
 
-LicodeToken LicodeTokenCreator::SyncCreate(const std::string& url, const std::string& userName, int timeoutMS) {
+
+LicodeToken LicodeNuveApi::SyncCreateToken(const std::string& url,
+                                           const std::string& userName,
+                                           const std::string& RoomName,
+                                           LicodeNuveApi::Roles role,
+                                           LicodeNuveApi::Type type,
+                                           int timeoutMS) {
   auto http = std::make_shared<SimpleHttpSession>();
   auto request = std::make_shared<HttpRequest<StringHttpBody>>();
   request->SetUrl(url);
@@ -145,11 +151,24 @@ LicodeToken LicodeTokenCreator::SyncCreate(const std::string& url, const std::st
   request->AddHeader("User-Agent", BOOST_BEAST_VERSION_STRING);
   request->AddHeader("Content-Type", "application/json");
   nlohmann::json body;
-  body["mediaConfiguration"] = false;
-  body["room"] = "basicExampleRoom";
-  body["type"] = "erizo";
-  body["username"] = userName;
-  body["role"] = "presenter";
+  body["mediaConfiguration"] = "default";
+  body["room"] = RoomName;
+
+  if (type == kP2p) {
+    body["type"] = "p2p";
+  } else {
+    body["type"] = "erizo";
+  }
+
+  body["username"] = userName; /// create token need it
+  if (role == kViewer) {
+    body["role"] = "viewer";
+  } else if (role == kViewerWithData) {
+    body["role"] = "viewerWithData";
+  } else {
+    body["role"] = "presenter";
+  }
+
   request->Body() = body.dump();
   request->PreparePayload();
   LicodeToken token;
@@ -170,4 +189,5 @@ LicodeToken LicodeTokenCreator::SyncCreate(const std::string& url, const std::st
   }
   return token;
 }
+
 }

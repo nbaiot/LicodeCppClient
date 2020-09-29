@@ -7,7 +7,7 @@
 
 #include "thread/thread_pool.h"
 #include "core/licode_signaling.h"
-#include "core/licode_token_creator.h"
+#include "core/licode_nuve_api.h"
 #include "messenger/websocket_session.h"
 
 using namespace nbaiot;
@@ -18,9 +18,10 @@ int main() {
   auto pool = std::make_shared<ThreadPool>(1);
   pool->Start();
 
-  auto token = LicodeTokenCreator::SyncCreate("http://106.53.67.18:3001/createToken/",
-                                              "jack",
-                                              3000);
+  auto token = LicodeNuveApi::SyncCreateToken("http://10.18.49.172:3001/createToken/",
+                                              "jack", "basicExampleRoom",
+                                              LicodeNuveApi::kPresenter,
+                                              LicodeNuveApi::kErizo);
 
   if (!token.Isvalid()) {
     LOG(ERROR) << ">>>>>> create token failed";
