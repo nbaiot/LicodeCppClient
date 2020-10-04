@@ -32,6 +32,7 @@ static const std::string SOCKET_IO_PACKET_BINARY_ACK = "6";
 
 static const std::string SOCKET_IO_WEBSOCKET_CONNECT = SOCKET_IO_MESSAGE + SOCKET_IO_PACKET_CONNECT;
 static const std::string SOCKET_IO_WEBSOCKET_DISCONNECT = SOCKET_IO_MESSAGE + SOCKET_IO_PACKET_DISCONNECT;
+static const std::string SOCKET_IO_WEBSOCKET_EVENT = SOCKET_IO_MESSAGE + SOCKET_IO_PACKET_EVENT;
 
 static const int64_t INIT_TOKEN_TRANS_ID = 111;
 static const std::string TOKEN_INIT_RESPONSE =
@@ -77,12 +78,16 @@ void LicodeSignaling::Dispose() {
   }
 }
 
-void LicodeSignaling::SetOnSignalingReadyCallback(LicodeSignaling::OnSignalingReadyCallback callback) {
-  ready_callback_ = std::move(callback);
+void LicodeSignaling::SetOnInitTokenCallback(LicodeSignaling::OnInitTokenCallback callback) {
+  init_token_callback_ = std::move(callback);
 }
 
-void LicodeSignaling::SetOnSignalingDisconnectCallback(LicodeSignaling::OnSignalingDisconnectCallback callback) {
+void LicodeSignaling::SetOnSignalingDisconnectCallback(LicodeSignaling::OnDisconnectCallback callback) {
   disconnect_callback_ = std::move(callback);
+}
+
+void LicodeSignaling::SetOnEventCallback(LicodeSignaling::OnEventCallback callback) {
+  event_callback_ = std::move(callback);
 }
 
 void LicodeSignaling::UpdateState(LicodeSignaling::State state) {
@@ -104,11 +109,15 @@ void LicodeSignaling::OnWebsocketMsg(const std::string& msg) {
   } else if (msg == SOCKET_IO_PONG) {
     ProcessPong();
   } else if (msg == SOCKET_IO_WEBSOCKET_CONNECT) {
+    UpdateState(kConnected);
+    KeepAlive();
     InitToken();
   } else if (msg.find(TOKEN_INIT_RESPONSE) == 0) {
     ProcessInitTokenResponse(msg.substr(TOKEN_INIT_RESPONSE.length()));
   } else if (msg == SOCKET_IO_WEBSOCKET_DISCONNECT) {
     ProcessDisconnect();
+  } else if (msg.find(SOCKET_IO_WEBSOCKET_EVENT) == 0) {
+    ProcessEvent(msg.substr(SOCKET_IO_WEBSOCKET_EVENT.length()));
   }
 }
 
@@ -146,22 +155,8 @@ bool LicodeSignaling::SocketIoPing() {
 }
 
 void LicodeSignaling::ProcessInitTokenResponse(const std::string& msg) {
-  auto response = nlohmann::json::parse(msg);
-  if (!response.is_array()) {
-    LOG(INFO) << ">>>>>>>> TOKEN_INIT_RESPONSE json not array";
-    return;
-  }
-  bool success = true;
-  std::string error = "init token success";
-  if (response[0] == "success") {
-    UpdateState(kConnected);
-    KeepAlive();
-  } else if (response[0] == "error"){
-    success = false;
-    error = response[1];
-  }
-  if (ready_callback_) {
-    ready_callback_(success, error);
+  if (init_token_callback_) {
+    init_token_callback_(msg);
   }
 }
 
@@ -183,5 +178,16 @@ void LicodeSignaling::ProcessPong() {
   /// TODO: check timeout: ping_interval_ms_ + ping_timeout_ms_
 }
 
+void LicodeSignaling::ProcessEvent(const std::string& msg) {
+  try {
+    auto event = nlohmann::json::parse(msg);
+    if (event_callback_) {
+      event_callback_(event[0], event[1].dump());
+    }
+  } catch (const std::exception& e) {
+    LOG(WARNING) << ">>>>>>>>>> ProcessEvent error:" << e.what();
+  }
+
+}
 
 }

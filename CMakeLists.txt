@@ -24,4 +24,4 @@ add_executable(LicodeCppClient
         ${MESSENGER_SRCS} ${THREAD_SRCS} ${CORE_SRCS}
         main.cpp)
 
-target_link_libraries(LicodeCppClient glog gflags pthread)
+target_link_libraries(LicodeCppClient glog gflags nettle pthread)

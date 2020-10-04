@@ -10,6 +10,8 @@
 #include <functional>
 
 #include "licode_token.h"
+#include "webrtc_stream_info.h"
+#include "licode_event.h"
 
 namespace nbaiot {
 
@@ -20,9 +22,11 @@ class WebsocketSession;
 class LicodeSignaling : public std::enable_shared_from_this<LicodeSignaling> {
 
 public:
-  using OnSignalingReadyCallback = std::function<void(bool, const std::string&)>;
+  using OnInitTokenCallback = std::function<void(const std::string&)>;
 
-  using OnSignalingDisconnectCallback = std::function<void()>;
+  using OnDisconnectCallback = std::function<void()>;
+
+  using OnEventCallback = std::function<void(const std::string& event, const std::string& msg)>;
 
   explicit LicodeSignaling(std::shared_ptr<Worker> worker);
 
@@ -38,9 +42,11 @@ public:
 
   void Dispose();
 
-  void SetOnSignalingReadyCallback(OnSignalingReadyCallback callback);
+  void SetOnInitTokenCallback(OnInitTokenCallback callback);
 
-  void SetOnSignalingDisconnectCallback(OnSignalingDisconnectCallback callback);
+  void SetOnSignalingDisconnectCallback(OnDisconnectCallback callback);
+
+  void SetOnEventCallback(OnEventCallback callback);
 
   State CurrentState();
 
@@ -67,6 +73,8 @@ private:
 
   void ProcessPong();
 
+  void ProcessEvent(const std::string& msg);
+
 private:
   State state_;
   LicodeToken token_;
@@ -76,8 +84,9 @@ private:
   int32_t ping_timeout_ms_;
   std::shared_ptr<Worker> worker_;
   std::shared_ptr<WebsocketSession> websocket_;
-  OnSignalingReadyCallback ready_callback_;
-  OnSignalingDisconnectCallback disconnect_callback_;
+  OnInitTokenCallback init_token_callback_;
+  OnDisconnectCallback disconnect_callback_;
+  OnEventCallback event_callback_;
 };
 
 }

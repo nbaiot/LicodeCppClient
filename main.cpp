@@ -8,7 +8,7 @@
 #include "thread/thread_pool.h"
 #include "core/licode_signaling.h"
 #include "core/licode_nuve_api.h"
-#include "messenger/websocket_session.h"
+#include "core/licode_room.h"
 
 using namespace nbaiot;
 
@@ -18,21 +18,36 @@ int main() {
   auto pool = std::make_shared<ThreadPool>(1);
   pool->Start();
 
-  auto token = LicodeNuveApi::SyncCreateToken("http://10.18.49.172:3001/createToken/",
-                                              "jack", "basicExampleRoom",
-                                              LicodeNuveApi::kPresenter,
-                                              LicodeNuveApi::kErizo);
+  auto nuve = std::make_shared<LicodeNuveApi>("5f79651b7a4a0783dd6c5682",
+                                              "5196", "192.168.1.4",
+                                              3000);
+  auto rooms = nuve->SyncListRoom();
 
-  if (!token.Isvalid()) {
-    LOG(ERROR) << ">>>>>> create token failed";
+  if (!rooms.has_value())
     return -1;
+
+  auto listRooms = rooms.value();
+
+  std::string exampleRoomId;
+  for (const auto& room: listRooms) {
+    if (room->Name() == "basicExampleRoom")
+      exampleRoomId = room->Id();
   }
 
-  auto signaling = std::make_shared<LicodeSignaling>(pool->GetLessUsedWorker());
-  signaling->SetOnSignalingReadyCallback([](bool success, const std::string& reason) {
-    LOG(INFO) << ">>>>>>>>>> Licode Signaling init success!!!";
-  });
-  signaling->Init(token);
+  if (exampleRoomId.empty())
+    return -1;
+
+
+  auto token = nuve->SyncCreateToken(exampleRoomId, "shajia", "test-role");
+
+  if (!token.has_value())
+    return -1;
+
+  auto licodeToken = token.value();
+
+  auto room = std::make_shared<LicodeRoom>(pool->GetLessUsedWorker(), licodeToken);
+
+  room->Join();
 
   std::mutex mutex;
   std::unique_lock<std::mutex> lk(mutex);
