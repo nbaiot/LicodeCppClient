@@ -4,6 +4,7 @@
 #include <condition_variable>
 
 #include <glog/logging.h>
+#include <rtc_base/logging.h>
 
 #include "thread/thread_pool.h"
 #include "core/licode_signaling.h"
@@ -14,6 +15,11 @@ using namespace nbaiot;
 
 int main() {
   LOG(INFO) << "Hello licode !!!" << std::endl;
+
+  rtc::LogMessage::LogTimestamps(true);
+  rtc::LogMessage::SetLogToStderr(true);
+  rtc::LogMessage::LogToDebug(rtc::INFO);
+  rtc::LogMessage::LogThreads(true);
 
   auto pool = std::make_shared<ThreadPool>(1);
   pool->Start();
