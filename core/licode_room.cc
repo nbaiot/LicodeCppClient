@@ -5,6 +5,7 @@
 #include "licode_room.h"
 #include "licode_signaling.h"
 #include "licode_stream.h"
+#include "licode_signaling_pkt_creator.h"
 #include <glog/logging.h>
 #include <nlohmann/json.hpp>
 
@@ -22,6 +23,9 @@ LicodeRoom::LicodeRoom(std::shared_ptr<Worker> worker, LicodeToken token)
   });
   signaling_->SetOnEventCallback([this](const std::string& event, const std::string& body){
     OnEvent(event, body);
+  });
+  signaling_->SetOnSubscribeCallback([this](const std::string& msg){
+    OnSubscribeStream(msg);
   });
 }
 
@@ -55,6 +59,12 @@ void LicodeRoom::Leave() {
   signaling_->Dispose();
 }
 
+void LicodeRoom::SubscribeStream(uint64_t streamId) {
+
+  auto pkt = LicodeSignalingPktCreator::CreateSubscribeStreamPkt(streamId);
+  signaling_->SendMsg(signaling_->SubscribeStreamMsgHeader() + pkt);
+}
+
 void LicodeRoom::Update(LicodeRoom::State state) {
   state_ = state;
 }
@@ -68,7 +78,7 @@ void LicodeRoom::OnJoinRoom(const std::string& msg) {
       auto body = json[1];
       LOG(INFO) << ">>>>>>>>>> join room:" << id_ << " success";
       id_ = body["id"];
-
+      client_id_ = body["clientId"];
       auto streams = body["streams"];
       stream_infos_.clear();
       for (const auto& stream : streams) {
@@ -78,6 +88,8 @@ void LicodeRoom::OnJoinRoom(const std::string& msg) {
             /// TODO: fixme
             stream["attributes"].dump());
         stream_infos_.emplace(std::make_pair(stream["id"], info));
+        /// TODO: fixme
+        SubscribeStream(stream["id"]);
       }
       if (body.contains("p2p")) {
         p2p_ = body["p2p"];
@@ -136,6 +148,7 @@ void LicodeRoom::OnAddStream(const std::string& msg) {
         stream["attributes"].dump());
     stream_infos_[stream["id"]] = info;
     LOG(INFO) << "add stream:" << stream["id"];
+    SubscribeStream(stream["id"]);
   } catch (const std::exception& e) {
     LOG(WARNING) << ">>>>>>>>>>>OnAddStream error:" << e.what();
   }
@@ -154,6 +167,21 @@ void LicodeRoom::OnRemoveStream(const std::string& msg) {
     LOG(WARNING) << ">>>>>>>>>>>OnRemoveStream error:" << e.what();
   }
 
+}
+
+void LicodeRoom::OnSubscribeStream(const std::string& msg) {
+  /// erizoId 和 connectionId
+  /// 发起 offer == > receive ErizoConnectionEvent:
+  /// LicodeSignalingPktCreator::CreateConnectionOfferMsg()
+  /// LicodeSignalingPktCreator::CreateConnectionPtk()
+
+  /// 收到 answer 之后 发送 candidate
+}
+
+void LicodeRoom::OnErizoConnectionEvent(const std::string& msg) {
+  /// 1. receive info:202, type answer
+  /// 2. receive info:104  type ready
+  /// 3. receive info:150 type quality_level
 }
 
 }

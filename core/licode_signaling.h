@@ -28,6 +28,8 @@ public:
 
   using OnEventCallback = std::function<void(const std::string& event, const std::string& msg)>;
 
+  using OnSubscribeStreamCallback = std::function<void(const std::string&)>;
+
   explicit LicodeSignaling(std::shared_ptr<Worker> worker);
 
   enum State {
@@ -48,7 +50,13 @@ public:
 
   void SetOnEventCallback(OnEventCallback callback);
 
+  void SetOnSubscribeCallback(OnSubscribeStreamCallback callback);
+
   State CurrentState();
+
+  void SendMsg(const std::string& msg);
+
+  std::string SubscribeStreamMsgHeader();
 
 private:
   void InitToken(bool singlePC = false);
@@ -73,6 +81,8 @@ private:
 
   void ProcessPong();
 
+  void ProcessSubscribeStream(const std::string& msg);
+
   void ProcessEvent(const std::string& msg);
 
 private:
@@ -87,6 +97,7 @@ private:
   OnInitTokenCallback init_token_callback_;
   OnDisconnectCallback disconnect_callback_;
   OnEventCallback event_callback_;
+  OnSubscribeStreamCallback subscribe_stream_callback_;
 };
 
 }

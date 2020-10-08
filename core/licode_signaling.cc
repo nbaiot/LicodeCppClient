@@ -4,6 +4,7 @@
 
 #include "licode_signaling.h"
 
+#include <regex>
 #include <glog/logging.h>
 
 #include <nlohmann/json.hpp>
@@ -38,6 +39,10 @@ static const int64_t INIT_TOKEN_TRANS_ID = 111;
 static const std::string TOKEN_INIT_RESPONSE =
     SOCKET_IO_MESSAGE + SOCKET_IO_PACKET_ACK + std::to_string(INIT_TOKEN_TRANS_ID);
 
+static const int64_t SUBSCRIBE_STREAM_TRANS_IS = 222;
+static const std::string SUBSCRIBE_STREAM_RESPONSE =
+    SOCKET_IO_MESSAGE + SOCKET_IO_PACKET_ACK + std::to_string(SUBSCRIBE_STREAM_TRANS_IS);
+
 LicodeSignaling::LicodeSignaling(std::shared_ptr<Worker> worker)
     : state_(kDisconnect), ping_interval_ms_(25000),
       ping_timeout_ms_(60000),
@@ -58,13 +63,13 @@ bool LicodeSignaling::Init(LicodeToken token) {
   signaling_url_ = "ws://" + token_.host + "/socket.io/?EIO=3&transport=websocket";
   websocket_ = std::make_shared<WebsocketSession>(signaling_url_);
   websocket_->SetOnReadyCallback([this]() {
-      OnWebsocketConnectCallback();
+    OnWebsocketConnectCallback();
   });
   websocket_->SetOnReceiveMsgCallback([this](const std::string& msg) {
-      OnWebsocketMsg(msg);
+    OnWebsocketMsg(msg);
   });
   websocket_->SetOnAbnormalDisconnectCallback([this](const std::string& reason) {
-      OnWebsocketDisconnect(reason);
+    OnWebsocketDisconnect(reason);
   });
 
   UpdateState(kConnecting);
@@ -104,20 +109,36 @@ void LicodeSignaling::OnWebsocketConnectCallback() {
 
 void LicodeSignaling::OnWebsocketMsg(const std::string& msg) {
   LOG(INFO) << ">>>>>>>>>> LicodeSignaling receive:" << msg;
-  if (msg.find(SOCKET_IO_OPEN) == 0) {
+
+
+  /// 提取开头数字
+  std::smatch numberMatch;
+  std::regex_search(msg, numberMatch, std::regex("^\\d+"));
+  std::string number = numberMatch.str();
+
+
+  if (number == SOCKET_IO_OPEN) {
     ProcessSocketIOOpen(msg.substr(SOCKET_IO_OPEN.length()));
-  } else if (msg == SOCKET_IO_PONG) {
+  } else if (number == SOCKET_IO_PONG) {
     ProcessPong();
-  } else if (msg == SOCKET_IO_WEBSOCKET_CONNECT) {
+  } else if (number == SOCKET_IO_WEBSOCKET_CONNECT) {
     UpdateState(kConnected);
     KeepAlive();
     InitToken();
-  } else if (msg.find(TOKEN_INIT_RESPONSE) == 0) {
+  } else if (number == TOKEN_INIT_RESPONSE) {
     ProcessInitTokenResponse(msg.substr(TOKEN_INIT_RESPONSE.length()));
-  } else if (msg == SOCKET_IO_WEBSOCKET_DISCONNECT) {
+  } else if (number == SOCKET_IO_WEBSOCKET_DISCONNECT) {
     ProcessDisconnect();
-  } else if (msg.find(SOCKET_IO_WEBSOCKET_EVENT) == 0) {
+  } else if (number == SUBSCRIBE_STREAM_RESPONSE) {
+    ProcessSubscribeStream(msg.substr(SUBSCRIBE_STREAM_RESPONSE.length()));
+  } else if (number == SOCKET_IO_WEBSOCKET_EVENT) {
     ProcessEvent(msg.substr(SOCKET_IO_WEBSOCKET_EVENT.length()));
+  }
+}
+
+void LicodeSignaling::ProcessSubscribeStream(const std::string& msg) {
+  if (subscribe_stream_callback_) {
+    subscribe_stream_callback_(msg);
   }
 }
 
@@ -138,8 +159,8 @@ void LicodeSignaling::InitToken(bool singlePC) {
 
 void LicodeSignaling::KeepAlive() {
   worker_->ScheduleEvery([this]() -> bool {
-      LOG(INFO) << ">>>>>>>>>> send ping";
-      return SocketIoPing();
+    LOG(INFO) << ">>>>>>>>>> send ping";
+    return SocketIoPing();
   }, std::chrono::milliseconds(ping_interval_ms_));
 }
 
@@ -161,7 +182,7 @@ void LicodeSignaling::ProcessInitTokenResponse(const std::string& msg) {
 }
 
 void LicodeSignaling::ProcessSocketIOOpen(const std::string& msg) {
-  LicodeSignalingPktParser::ParseOpenMsg(msg,sid_, ping_interval_ms_, ping_timeout_ms_);
+  LicodeSignalingPktParser::ParseOpenMsg(msg, sid_, ping_interval_ms_, ping_timeout_ms_);
 }
 
 void LicodeSignaling::ProcessDisconnect() {
@@ -188,6 +209,22 @@ void LicodeSignaling::ProcessEvent(const std::string& msg) {
     LOG(WARNING) << ">>>>>>>>>> ProcessEvent error:" << e.what();
   }
 
+}
+
+void LicodeSignaling::SendMsg(const std::string& msg) {
+  if (CurrentState() == kConnected) {
+    websocket_->SendMsg(msg);
+  }
+}
+
+void LicodeSignaling::SetOnSubscribeCallback(LicodeSignaling::OnSubscribeStreamCallback callback) {
+  subscribe_stream_callback_ = std::move(callback);
+}
+
+std::string LicodeSignaling::SubscribeStreamMsgHeader() {
+  return SOCKET_IO_MESSAGE +
+         SOCKET_IO_PACKET_EVENT +
+         std::to_string(SUBSCRIBE_STREAM_TRANS_IS);
 }
 
 }

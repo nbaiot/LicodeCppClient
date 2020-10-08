@@ -50,7 +50,8 @@ public:
 
   void UnPublishStream();
 
-  void SubscribeStream();
+  /// TODO: audio, video, data
+  void SubscribeStream(uint64_t streamId);
 
   void UnSubscriberStream();
 
@@ -77,9 +78,14 @@ private:
 
   void OnRemoveStream(const std::string& msg);
 
+  void OnSubscribeStream(const std::string& msg);
+
+  void OnErizoConnectionEvent(const std::string& msg);
+
 private:
   LicodeToken token_;
   std::string id_;
+  std::string client_id_;
   State state_;
   bool p2p_;
   bool single_pc_;

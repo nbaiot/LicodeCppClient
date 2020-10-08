@@ -18,8 +18,8 @@ int main() {
   auto pool = std::make_shared<ThreadPool>(1);
   pool->Start();
 
-  auto nuve = std::make_shared<LicodeNuveApi>("5f79651b7a4a0783dd6c5682",
-                                              "5196", "192.168.1.4",
+  auto nuve = std::make_shared<LicodeNuveApi>("5f7ead94016145f0772f4e0d",
+                                              "2475", "192.168.1.4",
                                               3000);
   auto rooms = nuve->SyncListRoom();
 
@@ -38,7 +38,8 @@ int main() {
     return -1;
 
 
-  auto token = nuve->SyncCreateToken(exampleRoomId, "shajia", "test-role");
+  /// role: presenter, viewer, viewerWithData
+  auto token = nuve->SyncCreateToken(exampleRoomId, "shajia", "viewer");
 
   if (!token.has_value())
     return -1;
