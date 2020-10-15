@@ -5,6 +5,7 @@
 #include "webrtc_wrapper.h"
 
 #include "rtc_base/thread.h"
+#include "rtc_base/logging.h"
 #include "api/audio_codecs/builtin_audio_decoder_factory.h"
 #include "api/audio_codecs/builtin_audio_encoder_factory.h"
 #include "api/video_codecs/builtin_video_decoder_factory.h"
@@ -24,8 +25,34 @@ void WebrtcWrapper::Init() {
   if (init_)
     return;
   init_ = true;
+  rtc::LogMessage::LogTimestamps(true);
+  rtc::LogMessage::SetLogToStderr(true);
+  rtc::LogMessage::LogThreads(true);
   signaling_thread_ = rtc::Thread::Create();
   signaling_thread_->Start();
+}
+
+void WebrtcWrapper::SetWebrtcLogLevel(WebrtcWrapper::WebrtcLogLevel level) {
+  switch (level) {
+    case kVerbose:
+      rtc::LogMessage::LogToDebug(rtc::LS_VERBOSE);
+      break;
+    case kInfo:
+      rtc::LogMessage::LogToDebug(rtc::LS_INFO);
+      break;
+    case kWarning:
+      rtc::LogMessage::LogToDebug(rtc::LS_WARNING);
+      break;
+    case kError:
+      rtc::LogMessage::LogToDebug(rtc::LS_ERROR);
+      break;
+    case kNone:
+      rtc::LogMessage::LogToDebug(rtc::LS_NONE);
+      break;
+    default:
+      rtc::LogMessage::LogToDebug(rtc::LS_WARNING);
+  }
+
 }
 
 rtc::Thread* WebrtcWrapper::SignalingThread() {

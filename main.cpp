@@ -4,28 +4,28 @@
 #include <condition_variable>
 
 #include <glog/logging.h>
-#include <rtc_base/logging.h>
+
 
 #include "thread/thread_pool.h"
 #include "core/licode_signaling.h"
 #include "core/licode_nuve_api.h"
 #include "core/licode_room.h"
 
+#include "core/webrtc_wrapper.h"
+
 using namespace nbaiot;
 
 int main() {
   LOG(INFO) << "Hello licode !!!" << std::endl;
 
-  rtc::LogMessage::LogTimestamps(true);
-  rtc::LogMessage::SetLogToStderr(true);
-  rtc::LogMessage::LogToDebug(rtc::INFO);
-  rtc::LogMessage::LogThreads(true);
+  WebrtcWrapper::Instance()->Init();
+  WebrtcWrapper::SetWebrtcLogLevel(WebrtcWrapper::kWarning);
 
   auto pool = std::make_shared<ThreadPool>(1);
   pool->Start();
 
-  auto nuve = std::make_shared<LicodeNuveApi>("5f7ead94016145f0772f4e0d",
-                                              "2475", "192.168.1.4",
+  auto nuve = std::make_shared<LicodeNuveApi>("5f886800d8251a76e4bfb9a8",
+                                              "7396", "192.168.1.4",
                                               3000);
   auto rooms = nuve->SyncListRoom();
 

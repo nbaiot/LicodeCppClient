@@ -13,6 +13,8 @@ include(cmake/external/gflags.cmake)
 include(cmake/external/glog.cmake)
 include(cmake/external/boost.cmake)
 
+add_definitions(-DWEBRTC_POSIX)
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third/json/single_include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third/webrtc/include)
@@ -28,4 +30,4 @@ add_executable(LicodeCppClient
         ${MESSENGER_SRCS} ${THREAD_SRCS} ${CORE_SRCS}
         main.cpp)
 
-target_link_libraries(LicodeCppClient glog gflags nettle webrtc pthread)
+target_link_libraries(LicodeCppClient glog gflags nettle webrtc X11 dl pthread)

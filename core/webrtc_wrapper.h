@@ -6,6 +6,7 @@
 #define LICODECPPCLIENT_WEBRTC_WRAPPER_H
 
 #include <memory>
+#include <third/webrtc/include/rtc_base/ref_counted_object.h>
 
 #include "api/scoped_refptr.h"
 #include "api/jsep.h"
@@ -23,7 +24,16 @@ namespace nbaiot {
 class WebrtcWrapper {
 
 public:
+  enum WebrtcLogLevel {
+    kVerbose,
+    kInfo,
+    kWarning,
+    kError,
+    kNone
+  };
   static WebrtcWrapper* Instance();
+
+  static void SetWebrtcLogLevel(WebrtcLogLevel level);
 
   void Init();
 

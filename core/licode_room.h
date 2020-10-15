@@ -10,10 +10,12 @@
 #include <vector>
 #include <functional>
 #include <unordered_map>
+#include <nlohmann/json.hpp>
 
 #include "licode_token.h"
 #include "webrtc_stream_info.h"
 #include "ice_server.h"
+#include "webrtc_connection.h"
 
 namespace nbaiot {
 
@@ -82,6 +84,12 @@ private:
 
   void OnErizoConnectionEvent(const std::string& msg);
 
+  void receiveOffer(const std::string& connId, const std::string& sdp);
+
+  void receiveAnswer(const std::string& connId, const std::string& sdp);
+
+  void CreateSubscribePeerConnection(uint64_t streamId);
+
 private:
   LicodeToken token_;
   std::string id_;
@@ -93,9 +101,15 @@ private:
   int max_video_bw_;
   std::shared_ptr<Worker> worker_;
   std::vector<IceServer> ice_server_list_;
+  /// TODO: add mutex ?
   std::unordered_map<uint64_t, std::shared_ptr<WebrtcStreamInfo>> stream_infos_;
+  std::unordered_map<uint64_t, rtc::scoped_refptr<rtc::RefCountedObject<WebrtcConnection>>> peer_connections_;
   std::unique_ptr<LicodeSignaling> signaling_;
   OnJoinRoomCallback join_room_callback_;
+
+  /// for test
+  std::string connId;
+  std::string erizoId;
 };
 
 }

@@ -20,10 +20,21 @@ public:
   /// TODO: fixme config
   static std::string CreateConnectionOfferMsg(const std::string& sdp, int maxVideoBW);
 
-  static std::string CreateConnectionCandidateMsg(int sdpMLineIndex, const std::string& sdpMid, const std::string& candidate);
+  static std::string CreateConnectionAnswerMsg(const std::string& sdp, int maxVideoBW);
+
+  static std::string CreateConnectionCandidateMsg(int sdpMLineIndex,
+                                                  const std::string& sdpMid,
+                                                  const std::string& candidate);
 
   static std::string CreateConnectionPtk(const std::string& connectionId,
-                                         const std::string& erizoId, const std::string& msg);
+                                         const std::string& erizoId,
+                                         const std::string& msg);
+
+  static std::string CreateOfferOrAnswerPkt(bool offer,
+                                            const std::string& erizoId,
+                                            const std::string& connId,
+                                            const std::string& sdp,
+                                            int maxVideoBW);
 
 };
 

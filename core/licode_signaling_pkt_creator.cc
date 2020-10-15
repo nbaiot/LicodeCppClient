@@ -35,7 +35,7 @@ std::string LicodeSignalingPktCreator::CreateSubscribeStreamPkt(uint64_t streamI
   stream["video"] = true;
   stream["data"] = true;
   stream["maxVideoBW"] = 300;
-  stream["offerFromErizo"] = false;
+  stream["offerFromErizo"] = true;
   /// TODO: fixme
   stream["browser"] = "cpp";
 
@@ -59,6 +59,17 @@ std::string LicodeSignalingPktCreator::CreateSubscribeStreamPkt(uint64_t streamI
 std::string LicodeSignalingPktCreator::CreateConnectionOfferMsg(const std::string& sdp, int maxVideoBW) {
   nlohmann::json msg;
   msg["type"] = "offer";
+  msg["sdp"] = sdp;
+  msg["receivedSessionVersion"] = -1;
+  nlohmann::json config;
+  config["maxVideoBW"] = maxVideoBW;
+  msg["config"] = config;
+  return msg.dump();
+}
+
+std::string LicodeSignalingPktCreator::CreateConnectionAnswerMsg(const std::string& sdp, int maxVideoBW) {
+  nlohmann::json msg;
+  msg["type"] = "answer";
   msg["sdp"] = sdp;
   msg["receivedSessionVersion"] = -1;
   nlohmann::json config;
@@ -93,4 +104,33 @@ std::string LicodeSignalingPktCreator::CreateConnectionPtk(const std::string& co
   connectionJson[2] = nlohmann::json::value_t::null;
   return connectionJson.dump();
 }
+
+std::string
+LicodeSignalingPktCreator::CreateOfferOrAnswerPkt(bool offer, const std::string& erizoId, const std::string& connId,
+                                                  const std::string& sdp, int maxVideoBW) {
+  auto json = nlohmann::json::array();
+  json[0] = "connectionMessage";
+
+  nlohmann::json info;
+  /// TODO:fixme
+  info["browser"] = "cpp";
+  info["connectionId"] = connId;
+  info["erizoId"] = erizoId;
+
+  nlohmann::json msg;
+  if (offer) {
+    msg = CreateConnectionOfferMsg(sdp, maxVideoBW);
+  } else {
+    msg = CreateConnectionAnswerMsg(sdp, maxVideoBW);
+  }
+  info["msg"] = msg;
+
+  json[1] = info;
+
+  json[2] = nlohmann::json::value_t::null;
+
+  return json.dump();
+}
+
+
 }
