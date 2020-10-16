@@ -4,6 +4,7 @@
 
 #include "webrtc_connection.h"
 #include "webrtc_wrapper.h"
+#include "video_render.h"
 
 #include <glog/logging.h>
 
@@ -13,19 +14,27 @@ namespace nbaiot {
 class DummySetSessionDescriptionObserver
     : public webrtc::SetSessionDescriptionObserver {
 public:
-  static DummySetSessionDescriptionObserver* Create() {
-    return new rtc::RefCountedObject<DummySetSessionDescriptionObserver>();
+  static DummySetSessionDescriptionObserver* Create(bool remote = false) {
+    return new rtc::RefCountedObject<DummySetSessionDescriptionObserver>(remote);
   }
 
   void OnSuccess() override {
-    LOG(INFO) << ">>>>>>>>>>>>>>>>>>=========== SetSessionDescription success";
+    LOG(INFO) << ">>>>>>>>>>>>>>>>>> SetSessionDescription "
+              << (remote_ ? "remote" : "local") << " sdp success";
   }
 
   void OnFailure(webrtc::RTCError error) override {
-    LOG(ERROR) << ">>>>>>>>>>>>>>>>>>=========== SetSessionDescription failed,"
+    LOG(ERROR) << ">>>>>>>>>>>>>>>>>> SetSessionDescription "
+               << (remote_ ? "remote" : "local") << " sdp failed."
                << webrtc::ToString(error.type()) << ": "
                << error.message();
   }
+
+protected:
+  explicit DummySetSessionDescriptionObserver(bool remote) : remote_(remote) {}
+
+private:
+  bool remote_;
 };
 
 WebrtcConnection::WebrtcConnection(const webrtc::PeerConnectionInterface::RTCConfiguration& config)
@@ -35,11 +44,29 @@ WebrtcConnection::WebrtcConnection(const webrtc::PeerConnectionInterface::RTCCon
 }
 
 void WebrtcConnection::SetRemoteDescription(std::unique_ptr<webrtc::SessionDescriptionInterface> desc) {
-  pc_->SetRemoteDescription(DummySetSessionDescriptionObserver::Create(), desc.release());
+  pc_->SetRemoteDescription(DummySetSessionDescriptionObserver::Create(true), desc.release());
+}
+
+void WebrtcConnection::SetLocalDescription(std::unique_ptr<webrtc::SessionDescriptionInterface> desc) {
+  pc_->SetLocalDescription(DummySetSessionDescriptionObserver::Create(), desc.release());
+}
+
+void WebrtcConnection::CreateOffer(const webrtc::PeerConnectionInterface::RTCOfferAnswerOptions& options) {
+  /// The CreateSessionDescriptionObserver callback will be called when done
+  pc_->CreateAnswer(this, options);
 }
 
 void WebrtcConnection::CreateAnswer(const webrtc::PeerConnectionInterface::RTCOfferAnswerOptions& options) {
+  /// The CreateSessionDescriptionObserver callback will be called when done.
   pc_->CreateAnswer(this, options);
+}
+
+void WebrtcConnection::SetSdpCreateSuccessCallback(WebrtcConnection::OnSdpCreateSuccessCallback callback) {
+  sdp_create_success_callback_ = std::move(callback);
+}
+
+void WebrtcConnection::SetIceCandidateCallback(WebrtcConnection::OnIceCandidateCallback callback) {
+  ice_candidate_callback_ = std::move(callback);
 }
 
 void WebrtcConnection::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
@@ -52,95 +79,74 @@ void WebrtcConnection::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
 }
 
 void WebrtcConnection::OnFailure(webrtc::RTCError error) {
-  LOG(INFO) << ">>>>>>WebrtcConnection OnFailure:" << error.message();
+  LOG(ERROR) << ">>>>>>WebrtcConnection OnFailure:" << error.message();
 }
 
 void WebrtcConnection::OnSignalingChange(webrtc::PeerConnectionInterface::SignalingState new_state) {
-  LOG(INFO) << ">>>>>>======================================WebrtcConnection OnSignalingChange:" << new_state;
+  LOG(INFO) << ">>>>>>WebrtcConnection OnSignalingChange:" << WebrtcWrapper::SignalingStateToString(new_state);
 }
 
 void WebrtcConnection::OnDataChannel(rtc::scoped_refptr<webrtc::DataChannelInterface> data_channel) {
-
+  LOG(INFO) << ">>>>>>WebrtcConnection OnDataChannel label:" << data_channel->label();
 }
 
 void WebrtcConnection::OnIceGatheringChange(webrtc::PeerConnectionInterface::IceGatheringState new_state) {
-  LOG(INFO) << ">>>>>>=====================================WebrtcConnection OnIceGatheringChange:" << new_state;
+  LOG(INFO) << ">>>>>>WebrtcConnection OnIceGatheringChange:" << WebrtcWrapper::IceGatheringStateToString(new_state);
 }
 
 void WebrtcConnection::OnIceCandidate(const webrtc::IceCandidateInterface* candidate) {
   std::string out;
   candidate->ToString(&out);
-  LOG(INFO) << ">>>>>>==============================WebrtcConnection OnIceCandidate:" << out;
-}
-
-void WebrtcConnection::SetSdpCreateSuccessCallback(WebrtcConnection::OnSdpCreateSuccessCallback callback) {
-  sdp_create_success_callback_ = std::move(callback);
-}
-
-void WebrtcConnection::OnAddStream(rtc::scoped_refptr<webrtc::MediaStreamInterface> stream) {
-  LOG(INFO) << ">>>>>>==============================WebrtcConnection OnAddStream";
-}
-
-void WebrtcConnection::OnRemoveStream(rtc::scoped_refptr<webrtc::MediaStreamInterface> stream) {
-  LOG(INFO) << ">>>>>>==============================WebrtcConnection OnRemoveStream";
+  LOG(INFO) << ">>>>>>WebrtcConnection OnIceCandidate:" << out;
+  if (ice_candidate_callback_) {
+    ice_candidate_callback_(candidate);
+  }
 }
 
 void WebrtcConnection::OnRenegotiationNeeded() {
-  LOG(INFO) << ">>>>>>==============================WebrtcConnection OnRenegotiationNeeded";
-}
-
-void WebrtcConnection::OnNegotiationNeededEvent(uint32_t event_id) {
-  LOG(INFO) << ">>>>>>==============================WebrtcConnection OnNegotiationNeededEvent";
+  LOG(INFO) << ">>>>>>WebrtcConnection OnRenegotiationNeeded";
 }
 
 void WebrtcConnection::OnIceConnectionChange(webrtc::PeerConnectionInterface::IceConnectionState new_state) {
-  LOG(INFO) << ">>>>>>==============================WebrtcConnection OnIceConnectionChange:" << new_state;
-}
-
-void
-WebrtcConnection::OnStandardizedIceConnectionChange(webrtc::PeerConnectionInterface::IceConnectionState new_state) {
-  LOG(INFO) << ">>>>>>==============================WebrtcConnection OnStandardizedIceConnectionChange:" << new_state;
+  LOG(INFO) << ">>>>>>WebrtcConnection OnIceConnectionChange:" << WebrtcWrapper::IceConnectionStateToString(new_state);
 }
 
 void WebrtcConnection::OnConnectionChange(webrtc::PeerConnectionInterface::PeerConnectionState new_state) {
-  LOG(INFO) << ">>>>>>==============================WebrtcConnection OnConnectionChange:" << (int)(new_state);
-}
-
-void WebrtcConnection::OnIceCandidateError(const std::string& host_candidate, const std::string& url, int error_code,
-                                           const std::string& error_text) {
-  LOG(INFO) << ">>>>>>==============================WebrtcConnection OnIceCandidateError:" << error_code;
-}
-
-void WebrtcConnection::OnIceCandidateError(const std::string& address, int port, const std::string& url, int error_code,
-                                           const std::string& error_text) {
-  LOG(INFO) << ">>>>>>==============22================WebrtcConnection OnIceCandidateError:" << error_code;
-}
-
-void WebrtcConnection::OnIceCandidatesRemoved(const std::vector<cricket::Candidate>& candidates) {
-  LOG(INFO) << ">>>>>>==============================WebrtcConnection OnIceCandidatesRemoved:" << candidates.size();
+  LOG(INFO) << ">>>>>>WebrtcConnection OnConnectionChange:"
+            << WebrtcWrapper::PeerConnectionStateToString(static_cast<int>(new_state));
 }
 
 void WebrtcConnection::OnIceConnectionReceivingChange(bool receiving) {
-  LOG(INFO) << ">>>>>>==============================WebrtcConnection OnIceConnectionReceivingChange:" << receiving;
-}
-
-void WebrtcConnection::OnIceSelectedCandidatePairChanged(const cricket::CandidatePairChangeEvent& event) {
-  LOG(INFO) << ">>>>>>==============================WebrtcConnection OnIceSelectedCandidatePairChanged";
+  LOG(INFO) << ">>>>>>WebrtcConnection OnIceConnectionReceivingChange:" << receiving;
 }
 
 void WebrtcConnection::OnAddTrack(rtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver,
                                   const std::vector<rtc::scoped_refptr<webrtc::MediaStreamInterface>>& streams) {
-  LOG(INFO) << ">>>>>>==============================WebrtcConnection OnAddTrack";
+  LOG(INFO) << ">>>>>>WebrtcConnection OnAddTrack " << "\n"
+            << "media type:" << receiver->media_type() << "\n"
+            << "track id:" << receiver->track()->id() << "\n"
+            << "track kind:" << receiver->track()->kind() << "\n";
+  /// TODO: fixme
+  if (receiver->track()->kind() == webrtc::MediaStreamTrackInterface::kVideoKind) {
+    auto* video_track = static_cast<webrtc::VideoTrackInterface*>(receiver->track().get());
+    video_track->AddOrUpdateSink(new VideoRender(), rtc::VideoSinkWants());
+  }
 }
 
 void WebrtcConnection::OnTrack(rtc::scoped_refptr<webrtc::RtpTransceiverInterface> transceiver) {
-  LOG(INFO) << ">>>>>>==============================WebrtcConnection OnTrack";
+  /// This will only be called if Unified Plan semantics are specified
+  LOG(INFO) << ">>>>>>WebrtcConnection OnTrack";
 }
 
 void WebrtcConnection::OnRemoveTrack(rtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) {
-  LOG(INFO) << ">>>>>>==============================WebrtcConnection OnRemoveTrack";
+  LOG(INFO) << ">>>>>>WebrtcConnection OnRemoveTrack " << "\n"
+            << "media type:" << receiver->media_type() << "\n"
+            << "track id:" << receiver->track()->id() << "\n"
+            << "track kind:" << receiver->track()->kind() << "\n";
 }
 
-
+rtc::scoped_refptr<webrtc::PeerConnectionInterface> WebrtcConnection::PeerConnection() {
+  return pc_;
+}
 
 }

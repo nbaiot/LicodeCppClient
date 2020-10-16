@@ -11,6 +11,8 @@
 
 namespace nbaiot {
 
+/// TODO: 对外提供 observer 代替大量单一设置 callback
+
 class WebrtcConnection : public webrtc::PeerConnectionObserver,
                          public webrtc::CreateSessionDescriptionObserver {
 
@@ -18,13 +20,24 @@ public:
 
   using OnSdpCreateSuccessCallback = std::function<void(webrtc::SdpType type, const std::string& sdp)>;
 
+  using OnIceCandidateCallback = std::function<void(const webrtc::IceCandidateInterface* candidate)>;
+
   explicit WebrtcConnection(const webrtc::PeerConnectionInterface::RTCConfiguration& config);
 
+  void SetLocalDescription(std::unique_ptr<webrtc::SessionDescriptionInterface> desc);
+
   void SetRemoteDescription(std::unique_ptr<webrtc::SessionDescriptionInterface> desc);
+
+  void CreateOffer(const webrtc::PeerConnectionInterface::RTCOfferAnswerOptions& options);
 
   void CreateAnswer(const webrtc::PeerConnectionInterface::RTCOfferAnswerOptions& options);
 
   void SetSdpCreateSuccessCallback(OnSdpCreateSuccessCallback callback);
+
+  void SetIceCandidateCallback(OnIceCandidateCallback callback);
+
+  /// TODO: add AttachVideoRenders(多个 render) and AttachAudioRender
+
 
   /// sdp observer
   void OnSuccess(webrtc::SessionDescriptionInterface* desc) override;
@@ -40,44 +53,31 @@ public:
 
   void OnIceCandidate(const webrtc::IceCandidateInterface* candidate) override;
 
-  void OnAddStream(rtc::scoped_refptr<webrtc::MediaStreamInterface> stream) override;
-
-  void OnRemoveStream(rtc::scoped_refptr<webrtc::MediaStreamInterface> stream) override;
-
   void OnRenegotiationNeeded() override;
-
-  void OnNegotiationNeededEvent(uint32_t event_id) override;
 
   void OnIceConnectionChange(webrtc::PeerConnectionInterface::IceConnectionState new_state) override;
 
-  void OnStandardizedIceConnectionChange(webrtc::PeerConnectionInterface::IceConnectionState new_state) override;
-
   void OnConnectionChange(webrtc::PeerConnectionInterface::PeerConnectionState new_state) override;
 
-  void OnIceCandidateError(const std::string& host_candidate, const std::string& url, int error_code,
-                           const std::string& error_text) override;
-
-  void OnIceCandidateError(const std::string& address, int port, const std::string& url, int error_code,
-                           const std::string& error_text) override;
-
-  void OnIceCandidatesRemoved(const std::vector<cricket::Candidate>& candidates) override;
-
   void OnIceConnectionReceivingChange(bool receiving) override;
-
-  void OnIceSelectedCandidatePairChanged(const cricket::CandidatePairChangeEvent& event) override;
 
   void OnAddTrack(rtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver,
                   const std::vector<rtc::scoped_refptr<webrtc::MediaStreamInterface>>& streams) override;
 
+  /// Note: This will only be called if Unified Plan semantics are specified.
   void OnTrack(rtc::scoped_refptr<webrtc::RtpTransceiverInterface> transceiver) override;
 
   void OnRemoveTrack(rtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) override;
+
+  /// TODO: only for test
+  rtc::scoped_refptr<webrtc::PeerConnectionInterface> PeerConnection();
 
 private:
   webrtc::PeerConnectionInterface::RTCConfiguration rtc_config_;
   rtc::scoped_refptr<webrtc::PeerConnectionInterface> pc_;
 
   OnSdpCreateSuccessCallback sdp_create_success_callback_;
+  OnIceCandidateCallback ice_candidate_callback_;
 };
 
 }

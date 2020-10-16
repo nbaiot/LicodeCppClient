@@ -81,9 +81,12 @@ std::string LicodeSignalingPktCreator::CreateConnectionAnswerMsg(const std::stri
 std::string LicodeSignalingPktCreator::CreateConnectionCandidateMsg(int sdpMLineIndex, const std::string& sdpMid,
                                                                     const std::string& candidate) {
   nlohmann::json msg;
-  msg["sdpMLineIndex"] = sdpMLineIndex;
-  msg["sdpMid"] = sdpMid;
-  msg["candidate"] = candidate;
+  msg["type"] = "candidate";
+  nlohmann::json cand;
+  cand["sdpMLineIndex"] = sdpMLineIndex;
+  cand["sdpMid"] = sdpMid;
+  cand["candidate"] = candidate;
+  msg["candidate"] = cand;
   msg["receivedSessionVersion"] = 0;
   return msg.dump();
 }
@@ -98,6 +101,7 @@ std::string LicodeSignalingPktCreator::CreateConnectionPtk(const std::string& co
   connection["connectionId"] = connectionId;
   connection["erizoId"] = erizoId;
   connection["msg"] = nlohmann::json::parse(msg);
+  /// TODO: fixme
   connection["browser"] = "cpp";
 
   connectionJson[1] = connection;
@@ -119,16 +123,14 @@ LicodeSignalingPktCreator::CreateOfferOrAnswerPkt(bool offer, const std::string&
 
   nlohmann::json msg;
   if (offer) {
-    msg = CreateConnectionOfferMsg(sdp, maxVideoBW);
+    msg = nlohmann::json::parse(CreateConnectionOfferMsg(sdp, maxVideoBW));
   } else {
-    msg = CreateConnectionAnswerMsg(sdp, maxVideoBW);
+    msg = nlohmann::json::parse(CreateConnectionAnswerMsg(sdp, maxVideoBW));
   }
   info["msg"] = msg;
-
   json[1] = info;
 
   json[2] = nlohmann::json::value_t::null;
-
   return json.dump();
 }
 

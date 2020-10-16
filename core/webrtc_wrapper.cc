@@ -74,8 +74,82 @@ rtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface> WebrtcWrapper::Create
 }
 
 std::unique_ptr<webrtc::SessionDescriptionInterface>
-WebrtcWrapper::CreateSessionDescription(webrtc::SdpType type, const std::string& sdp, webrtc::SdpParseError* error_out) {
+WebrtcWrapper::CreateSessionDescription(webrtc::SdpType type, const std::string& sdp,
+                                        webrtc::SdpParseError* error_out) {
   return webrtc::CreateSessionDescription(type, sdp, error_out);
+}
+
+std::string WebrtcWrapper::SignalingStateToString(int state) {
+  switch (state) {
+    case webrtc::PeerConnectionInterface::SignalingState::kStable:
+      return "Stable";
+    case webrtc::PeerConnectionInterface::SignalingState::kHaveLocalOffer:
+      return "HaveLocalOffer";
+    case webrtc::PeerConnectionInterface::SignalingState::kHaveLocalPrAnswer:
+      return "HaveLocalPrAnswer";
+    case webrtc::PeerConnectionInterface::SignalingState::kHaveRemoteOffer:
+      return "HaveRemoteOffer";
+    case webrtc::PeerConnectionInterface::SignalingState::kHaveRemotePrAnswer:
+      return "HaveRemotePrAnswer";
+    case webrtc::PeerConnectionInterface::SignalingState::kClosed:
+      return "Closed";
+    default:
+      return "Unknown";
+  }
+}
+
+std::string WebrtcWrapper::IceGatheringStateToString(int state) {
+  switch (state) {
+    case webrtc::PeerConnectionInterface::IceGatheringState::kIceGatheringNew:
+      return "IceGatheringNew";
+    case webrtc::PeerConnectionInterface::IceGatheringState::kIceGatheringGathering:
+      return "IceGatheringGathering";
+    case webrtc::PeerConnectionInterface::IceGatheringState::kIceGatheringComplete:
+      return "IceGatheringComplete";
+    default:
+      return "Unknown";
+  }
+}
+
+std::string WebrtcWrapper::IceConnectionStateToString(int state) {
+  switch (state) {
+    case webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionNew:
+      return "IceConnectionNew";
+    case webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionChecking:
+      return "IceConnectionChecking";
+    case webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionConnected:
+      return "IceConnectionConnected";
+    case webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionCompleted:
+      return "IceConnectionConnected";
+    case webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionFailed:
+      return "IceConnectionFailed";
+    case webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionDisconnected:
+      return "IceConnectionDisconnected";
+    case webrtc::PeerConnectionInterface::IceConnectionState::kIceConnectionClosed:
+      return "IceConnectionClosed";
+    default:
+      return "Unknown";
+  }
+
+}
+
+std::string WebrtcWrapper::PeerConnectionStateToString(int state) {
+  switch (state) {
+    case static_cast<int>(webrtc::PeerConnectionInterface::PeerConnectionState::kNew):
+      return "New";
+    case static_cast<int>(webrtc::PeerConnectionInterface::PeerConnectionState::kConnecting):
+      return "Connecting";
+    case static_cast<int>(webrtc::PeerConnectionInterface::PeerConnectionState::kConnected):
+      return "Connected";
+    case static_cast<int>(webrtc::PeerConnectionInterface::PeerConnectionState::kDisconnected):
+      return "Disconnected";
+    case static_cast<int>(webrtc::PeerConnectionInterface::PeerConnectionState::kFailed):
+      return "Failed";
+    case static_cast<int>(webrtc::PeerConnectionInterface::PeerConnectionState::kClosed):
+      return "Closed";
+    default:
+      return "Unknown";
+  }
 }
 
 }

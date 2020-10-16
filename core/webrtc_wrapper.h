@@ -6,8 +6,8 @@
 #define LICODECPPCLIENT_WEBRTC_WRAPPER_H
 
 #include <memory>
-#include <third/webrtc/include/rtc_base/ref_counted_object.h>
 
+#include "rtc_base/ref_counted_object.h"
 #include "api/scoped_refptr.h"
 #include "api/jsep.h"
 
@@ -41,9 +41,16 @@ public:
 
   rtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface> CreatePCFactory();
 
-  std::unique_ptr<webrtc::SessionDescriptionInterface> CreateSessionDescription(webrtc::SdpType type,
+  static std::unique_ptr<webrtc::SessionDescriptionInterface> CreateSessionDescription(webrtc::SdpType type,
                                                                                 const std::string& sdp,
                                                                                 webrtc::SdpParseError* error_out);
+  static std::string SignalingStateToString(int state);
+
+  static std::string IceGatheringStateToString(int state);
+
+  static std::string IceConnectionStateToString(int state);
+
+  static std::string PeerConnectionStateToString(int state);
 
 private:
   WebrtcWrapper() = default;
