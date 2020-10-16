@@ -10,7 +10,7 @@
 #include <optional>
 
 #include "licode_token.h"
-#include "room_info.h"
+#include "licode_room_info.h"
 
 namespace nbaiot {
 
@@ -21,17 +21,17 @@ public:
                 std::string url,
                 int16_t port);
 
-  std::optional<std::shared_ptr<RoomInfo>> SyncCreateRoom(const std::string& name,
-                                                          const std::string& mediaConfiguration,
-                                                          const std::string& roomData,
-                                                          bool p2p = false);
+  std::optional<std::shared_ptr<LicodeRoomInfo>> SyncCreateRoom(const std::string& name,
+                                                                const std::string& mediaConfiguration,
+                                                                const std::string& roomData,
+                                                                bool p2p = false);
 
   bool SyncDestroyRoom(const std::string& roomId);
 
-  std::optional<std::shared_ptr<RoomInfo>> SyncGetRoom(const std::string& roomId);
+  std::optional<std::shared_ptr<LicodeRoomInfo>> SyncGetRoom(const std::string& roomId);
 
 
-  std::optional<std::vector<std::shared_ptr<RoomInfo>>> SyncListRoom();
+  std::optional<std::vector<std::shared_ptr<LicodeRoomInfo>>> SyncListRoom();
 
 
   std::optional<LicodeToken> SyncCreateToken(const std::string& roomId,

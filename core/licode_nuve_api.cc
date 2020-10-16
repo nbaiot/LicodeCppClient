@@ -147,9 +147,9 @@ LicodeNuveApi::LicodeNuveApi(std::string serviceId, std::string key, std::string
 
 }
 
-std::optional<std::shared_ptr<RoomInfo>> LicodeNuveApi::SyncCreateRoom(const std::string& name,
-                                                                       const std::string& mediaConfiguration,
-                                                                       const std::string& roomData, bool p2p) {
+std::optional<std::shared_ptr<LicodeRoomInfo>> LicodeNuveApi::SyncCreateRoom(const std::string& name,
+                                                                             const std::string& mediaConfiguration,
+                                                                             const std::string& roomData, bool p2p) {
 
   std::string target = "/rooms";
 
@@ -169,11 +169,11 @@ std::optional<std::shared_ptr<RoomInfo>> LicodeNuveApi::SyncCreateRoom(const std
   try {
     auto response = nlohmann::json::parse(result);
 
-    return std::optional(std::make_shared<RoomInfo>(response.value<std::string>("_id", ""),
-                                                    response.value<std::string>("name", ""),
-                                                    response.value<std::string>("data", ""),
-                                                    response.value<std::string>("mediaConfiguration", ""),
-                                                    response.value<bool>("p2p", false)));
+    return std::optional(std::make_shared<LicodeRoomInfo>(response.value<std::string>("_id", ""),
+                                                          response.value<std::string>("name", ""),
+                                                          response.value<std::string>("data", ""),
+                                                          response.value<std::string>("mediaConfiguration", ""),
+                                                          response.value<bool>("p2p", false)));
   } catch (const std::exception& e) {
     LOG(ERROR) << ">>>>>>>>>>SyncCreateRoom error:" << e.what();
     return std::nullopt;
@@ -187,7 +187,7 @@ bool LicodeNuveApi::SyncDestroyRoom(const std::string& roomId) {
   return result == "Room deleted";
 }
 
-std::optional<std::shared_ptr<RoomInfo>> LicodeNuveApi::SyncGetRoom(const std::string& roomId) {
+std::optional<std::shared_ptr<LicodeRoomInfo>> LicodeNuveApi::SyncGetRoom(const std::string& roomId) {
   std::string target = "/rooms/" + roomId;
   auto result = SyncRequest("GET", "", target);
   if (result.empty())
@@ -195,11 +195,11 @@ std::optional<std::shared_ptr<RoomInfo>> LicodeNuveApi::SyncGetRoom(const std::s
   try {
     auto response = nlohmann::json::parse(result);
 
-    return std::optional(std::make_shared<RoomInfo>(response.value<std::string>("_id", ""),
-                                                    response.value<std::string>("name", ""),
-                                                    response.value<std::string>("data", ""),
-                                                    response.value<std::string>("mediaConfiguration", ""),
-                                                    response.value<bool>("p2p", false)));
+    return std::optional(std::make_shared<LicodeRoomInfo>(response.value<std::string>("_id", ""),
+                                                          response.value<std::string>("name", ""),
+                                                          response.value<std::string>("data", ""),
+                                                          response.value<std::string>("mediaConfiguration", ""),
+                                                          response.value<bool>("p2p", false)));
   } catch (const std::exception& e) {
     LOG(ERROR) << ">>>>>>>>>>SyncGetRoom error:" << e.what();
     return std::nullopt;
@@ -231,7 +231,7 @@ LicodeNuveApi::SyncCreateToken(const std::string& roomId, const std::string& use
 }
 
 
-std::optional<std::vector<std::shared_ptr<RoomInfo>>> LicodeNuveApi::SyncListRoom() {
+std::optional<std::vector<std::shared_ptr<LicodeRoomInfo>>> LicodeNuveApi::SyncListRoom() {
 
   std::string target = "/rooms";
   auto result = SyncRequest("GET", "", target);
@@ -240,7 +240,7 @@ std::optional<std::vector<std::shared_ptr<RoomInfo>>> LicodeNuveApi::SyncListRoo
 
   try {
     auto response = nlohmann::json::parse(result);
-    std::vector<std::shared_ptr<RoomInfo>> rooms;
+    std::vector<std::shared_ptr<LicodeRoomInfo>> rooms;
     rooms.reserve(response.size());
     for (auto& room : response) {
       std::string name;
@@ -260,11 +260,11 @@ std::optional<std::vector<std::shared_ptr<RoomInfo>>> LicodeNuveApi::SyncListRoo
       if (!room["mediaConfiguration"].is_null()) {
         mediaConfiguration = room["mediaConfiguration"];
       }
-      rooms.push_back(std::make_shared<RoomInfo>(room.value<std::string>("_id", ""),
-                                                 room.value<std::string>("name", ""),
-                                                 data,
-                                                 mediaConfiguration,
-                                                 false));
+      rooms.push_back(std::make_shared<LicodeRoomInfo>(room.value<std::string>("_id", ""),
+                                                       room.value<std::string>("name", ""),
+                                                       data,
+                                                       mediaConfiguration,
+                                                       false));
     }
     return std::optional(rooms);
   } catch (const std::exception& e) {

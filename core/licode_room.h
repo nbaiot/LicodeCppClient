@@ -13,7 +13,7 @@
 #include <nlohmann/json.hpp>
 
 #include "licode_token.h"
-#include "webrtc_stream_info.h"
+#include "licode_stream_info.h"
 #include "ice_server.h"
 #include "webrtc_connection.h"
 
@@ -22,8 +22,6 @@ namespace nbaiot {
 class Worker;
 
 class LicodeSignaling;
-
-class LicodeStream;
 
 class LicodeRoom : public std::enable_shared_from_this<LicodeRoom> {
 
@@ -102,7 +100,7 @@ private:
   std::shared_ptr<Worker> worker_;
   std::vector<IceServer> ice_server_list_;
   /// TODO: add mutex ?
-  std::unordered_map<uint64_t, std::shared_ptr<WebrtcStreamInfo>> stream_infos_;
+  std::unordered_map<uint64_t, std::shared_ptr<LicodeStreamInfo>> stream_infos_;
   std::unordered_map<uint64_t, rtc::scoped_refptr<rtc::RefCountedObject<WebrtcConnection>>> peer_connections_;
   std::unique_ptr<LicodeSignaling> signaling_;
   OnJoinRoomCallback join_room_callback_;

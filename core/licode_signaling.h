@@ -10,7 +10,7 @@
 #include <functional>
 
 #include "licode_token.h"
-#include "webrtc_stream_info.h"
+#include "licode_stream_info.h"
 #include "licode_event.h"
 
 namespace nbaiot {

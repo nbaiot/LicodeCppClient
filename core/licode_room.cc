@@ -4,7 +4,6 @@
 
 #include "licode_room.h"
 #include "licode_signaling.h"
-#include "licode_stream.h"
 #include "licode_signaling_pkt_creator.h"
 #include "webrtc_wrapper.h"
 #include <glog/logging.h>
@@ -83,7 +82,7 @@ void LicodeRoom::OnJoinRoom(const std::string& msg) {
       auto streams = body["streams"];
       stream_infos_.clear();
       for (const auto& stream : streams) {
-        auto info = std::make_shared<WebrtcStreamInfo>(
+        auto info = std::make_shared<LicodeStreamInfo>(
             stream["id"], stream["video"], stream["audio"], stream["data"],
             stream["label"], stream["screen"],
             /// TODO: fixme
@@ -147,7 +146,7 @@ void LicodeRoom::OnEvent(const std::string& event, const std::string& msg) {
 void LicodeRoom::OnAddStream(const std::string& msg) {
   try {
     auto stream = nlohmann::json::parse(msg);
-    auto info = std::make_shared<WebrtcStreamInfo>(
+    auto info = std::make_shared<LicodeStreamInfo>(
         stream["id"], stream["video"], stream["audio"], stream["data"],
         stream["label"], stream["screen"],
         /// TODO: fixme

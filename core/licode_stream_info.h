@@ -2,17 +2,17 @@
 // Created by nbaiot@126.com on 2020/10/2.
 //
 
-#ifndef LICODECPPCLIENT_WEBRTC_STREAM_INFO_H
-#define LICODECPPCLIENT_WEBRTC_STREAM_INFO_H
+#ifndef LICODECPPCLIENT_LICODE_STREAM_INFO_H
+#define LICODECPPCLIENT_LICODE_STREAM_INFO_H
 
 #include <string>
 
 namespace nbaiot {
 
-class WebrtcStreamInfo {
+class LicodeStreamInfo {
 
 public:
-  WebrtcStreamInfo(uint64_t id,
+  LicodeStreamInfo(uint64_t id,
                    bool hasVideo,
                    bool hasAudio,
                    bool hasData,
@@ -26,7 +26,7 @@ public:
 
   }
 
-  WebrtcStreamInfo() : WebrtcStreamInfo(0, false, false, false, "", false, "") {}
+  LicodeStreamInfo() : LicodeStreamInfo(0, false, false, false, "", false, "") {}
 
   uint64_t Id() {
     return id_;
@@ -71,4 +71,4 @@ public:
 
 }
 
-#endif //LICODECPPCLIENT_WEBRTC_STREAM_INFO_H
+#endif //LICODECPPCLIENT_LICODE_STREAM_INFO_H

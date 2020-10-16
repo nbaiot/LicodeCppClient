@@ -2,17 +2,17 @@
 // Created by nbaiot@126.com on 2020/10/3.
 //
 
-#ifndef LICODECPPCLIENT_ROOM_INFO_H
-#define LICODECPPCLIENT_ROOM_INFO_H
+#ifndef LICODECPPCLIENT_LICODE_ROOM_INFO_H
+#define LICODECPPCLIENT_LICODE_ROOM_INFO_H
 
 #include <string>
 
 namespace nbaiot {
 
-class RoomInfo {
+class LicodeRoomInfo {
 
 public:
-  RoomInfo(std::string id, std::string name, std::string data, std::string mediaConfiguration, bool p2p)
+  LicodeRoomInfo(std::string id, std::string name, std::string data, std::string mediaConfiguration, bool p2p)
       : id_(std::move(id)), name_(std::move(name)), data_(std::move(data)),
         media_configuration_(std::move(mediaConfiguration)), p2p_(p2p) {}
 
@@ -47,4 +47,4 @@ private:
 
 }
 
-#endif //LICODECPPCLIENT_ROOM_INFO_H
+#endif //LICODECPPCLIENT_LICODE_ROOM_INFO_H
