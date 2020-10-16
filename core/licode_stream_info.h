@@ -56,6 +56,14 @@ public:
     return attributes_;
   }
 
+  void SetConnectionId(std::string connId) {
+    connection_id_ = std::move(connId);
+  }
+
+  std::string ConnectionId() {
+    return connection_id_;
+  }
+
 
 public:
   uint64_t id_;
@@ -66,6 +74,7 @@ public:
   bool screen_;
   /// type: public private
   std::string attributes_;
+  std::string connection_id_;
 
 };
 

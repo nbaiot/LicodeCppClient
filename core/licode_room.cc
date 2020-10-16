@@ -61,6 +61,7 @@ void LicodeRoom::Leave() {
 
 void LicodeRoom::SubscribeStream(uint64_t streamId) {
   LOG(INFO) << ">>>>>>>>>>>>>>>> start subscribe stream id:" << streamId;
+  worker_->
   auto pkt = LicodeSignalingPktCreator::CreateSubscribeStreamPkt(streamId);
   signaling_->SendMsg(signaling_->SubscribeStreamMsgHeader() + pkt);
 }
