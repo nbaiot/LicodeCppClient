@@ -24,7 +24,8 @@
 
 #include "messenger/http_defines.h"
 #include "messenger/http_request.h"
-#include "hmac.h"
+#include "third/hash-library/sha1.h"
+#include "third/hash-library/hmac.h"
 #include <glog/logging.h>
 
 namespace nbaiot {
@@ -274,8 +275,7 @@ std::optional<std::vector<std::shared_ptr<RoomInfo>>> LicodeNuveApi::SyncListRoo
 }
 
 std::string LicodeNuveApi::CalculateSignature(const std::string& toSign, const std::string& key) {
-  Hmac hmac(key);
-  auto hash = hmac.Sha1(toSign);
+  auto hash = hmac<SHA1>(toSign, key);
   using namespace boost::archive::iterators;
   std::stringstream result;
   typedef base64_from_binary<transform_width<std::string::const_iterator, 6, 8>> binary_t;

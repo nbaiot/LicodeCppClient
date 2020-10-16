@@ -4,3 +4,6 @@
 [submodule "third/json"]
 	path = third/json
 	url = https://github.com/nlohmann/json.git
+[submodule "third/hash-library"]
+	path = third/hash-library
+	url = https://github.com/stbrumme/hash-library.git
