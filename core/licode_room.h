@@ -5,6 +5,7 @@
 #ifndef LICODECPPCLIENT_LICODE_ROOM_H
 #define LICODECPPCLIENT_LICODE_ROOM_H
 
+#include <queue>
 #include <string>
 #include <memory>
 #include <vector>
@@ -82,16 +83,21 @@ private:
 
   void OnErizoConnectionEvent(const std::string& msg);
 
+  void OnPeerConnectionConnectErizoReady(const std::string& connId);
+
   void receiveOffer(const std::string& connId, const std::string& sdp);
 
   void receiveAnswer(const std::string& connId, const std::string& sdp);
 
   void CreateSubscribePeerConnection(uint64_t streamId);
 
+  std::function<void()> SafeTask(const std::function<void(std::shared_ptr<LicodeRoom>)>& function);
+
 private:
   LicodeToken token_;
   std::string id_;
   std::string client_id_;
+  std::string erizo_id_;
   State state_;
   bool p2p_;
   bool single_pc_;
@@ -99,15 +105,17 @@ private:
   int max_video_bw_;
   std::shared_ptr<Worker> worker_;
   std::vector<IceServer> ice_server_list_;
-  /// TODO: add mutex ?
+
+  /// TODO: map must be operation at worker thread
   std::unordered_map<uint64_t, std::shared_ptr<LicodeStreamInfo>> stream_infos_;
   std::unordered_map<uint64_t, rtc::scoped_refptr<rtc::RefCountedObject<WebrtcConnection>>> peer_connections_;
+
+
+
   std::unique_ptr<LicodeSignaling> signaling_;
+  std::queue<uint64_t> pending_subscribe_streams_;
   OnJoinRoomCallback join_room_callback_;
 
-  /// for test
-  std::string connId;
-  std::string erizoId;
 };
 
 }

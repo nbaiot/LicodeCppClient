@@ -227,4 +227,8 @@ std::string LicodeSignaling::SubscribeStreamMsgHeader() {
          std::to_string(SUBSCRIBE_STREAM_TRANS_IS);
 }
 
+std::string LicodeSignaling::EventHeader() {
+  return SOCKET_IO_WEBSOCKET_EVENT;
+}
+
 }

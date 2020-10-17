@@ -56,7 +56,10 @@ public:
 
   void SendMsg(const std::string& msg);
 
-  std::string SubscribeStreamMsgHeader();
+  static std::string SubscribeStreamMsgHeader();
+
+  static std::string EventHeader();
+
 
 private:
   void InitToken(bool singlePC = false);

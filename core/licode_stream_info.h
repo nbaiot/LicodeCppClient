@@ -64,6 +64,15 @@ public:
     return connection_id_;
   }
 
+  void SetConnected(bool connect) {
+    connected_ = connect;
+  }
+
+  bool Connected() {
+    return connected_;
+  }
+
+
 
 public:
   uint64_t id_;
@@ -75,6 +84,7 @@ public:
   /// type: public private
   std::string attributes_;
   std::string connection_id_;
+  bool connected_{false};
 
 };
 

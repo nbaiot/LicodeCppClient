@@ -6,6 +6,7 @@
 #include "licode_signaling.h"
 #include "licode_signaling_pkt_creator.h"
 #include "webrtc_wrapper.h"
+#include "thread/worker.h"
 #include <glog/logging.h>
 #include <nlohmann/json.hpp>
 
@@ -16,16 +17,16 @@ LicodeRoom::LicodeRoom(std::shared_ptr<Worker> worker, LicodeToken token)
       default_video_bw_(0), max_video_bw_(0), worker_(std::move(worker)) {
   signaling_ = std::make_unique<LicodeSignaling>(worker_);
   signaling_->SetOnInitTokenCallback([this](const std::string& msg) {
-      OnJoinRoom(msg);
+    OnJoinRoom(msg);
   });
   signaling_->SetOnSignalingDisconnectCallback([this]() {
-      OnLeaveRoom();
+    OnLeaveRoom();
   });
   signaling_->SetOnEventCallback([this](const std::string& event, const std::string& body) {
-      OnEvent(event, body);
+    OnEvent(event, body);
   });
   signaling_->SetOnSubscribeCallback([this](const std::string& msg) {
-      OnSubscribeStream(msg);
+    OnSubscribeStream(msg);
   });
 }
 
@@ -60,10 +61,12 @@ void LicodeRoom::Leave() {
 }
 
 void LicodeRoom::SubscribeStream(uint64_t streamId) {
-  LOG(INFO) << ">>>>>>>>>>>>>>>> start subscribe stream id:" << streamId;
-  worker_->
-  auto pkt = LicodeSignalingPktCreator::CreateSubscribeStreamPkt(streamId);
-  signaling_->SendMsg(signaling_->SubscribeStreamMsgHeader() + pkt);
+  worker_->PostTask(SafeTask([streamId](const std::shared_ptr<LicodeRoom>& room) {
+    LOG(INFO) << ">>>>>>>>>>>>>>>> start subscribe stream id:" << streamId;
+    auto pkt = LicodeSignalingPktCreator::CreateSubscribeStreamPkt(streamId);
+    room->pending_subscribe_streams_.push(streamId);
+    room->signaling_->SendMsg(room->signaling_->SubscribeStreamMsgHeader() + pkt);
+  }));
 }
 
 void LicodeRoom::Update(LicodeRoom::State state) {
@@ -74,24 +77,20 @@ void LicodeRoom::OnJoinRoom(const std::string& msg) {
 
   try {
     auto json = nlohmann::json::parse(msg);
-    Update(kConnected);
     if (json[0] == "success") {
       auto body = json[1];
       LOG(INFO) << ">>>>>>>>>> join room:" << id_ << " success";
       id_ = body["id"];
       client_id_ = body["clientId"];
-      auto streams = body["streams"];
       stream_infos_.clear();
+      std::vector<std::shared_ptr<LicodeStreamInfo>> existStreams;
+      auto streams = body["streams"];
       for (const auto& stream : streams) {
         auto info = std::make_shared<LicodeStreamInfo>(
             stream["id"], stream["video"], stream["audio"], stream["data"],
             stream["label"], stream["screen"],
-            /// TODO: fixme
             stream["attributes"].dump());
-        stream_infos_.emplace(std::make_pair(stream["id"], info));
-        /// TODO: fixme
-        CreateSubscribePeerConnection(stream["id"]);
-        SubscribeStream(stream["id"]);
+        existStreams.push_back(info);
       }
       if (body.contains("p2p")) {
         p2p_ = body["p2p"];
@@ -115,7 +114,13 @@ void LicodeRoom::OnJoinRoom(const std::string& msg) {
         join_room_callback_();
       }
 
-      /// TODO: stream
+      for (const auto& info: existStreams) {
+        worker_->PostTask(SafeTask([info](const std::shared_ptr<LicodeRoom>& room) {
+          room->stream_infos_.emplace(std::make_pair(info->Id(), info));
+          room->CreateSubscribePeerConnection(info->Id());
+          room->SubscribeStream(info->Id());
+        }));
+      }
     } else {
       Update(kDisconnected);
       LOG(INFO) << ">>>>>>>>>> join room:" << id_ << " failed," << json[1];
@@ -187,9 +192,19 @@ void LicodeRoom::OnSubscribeStream(const std::string& msg) {
   /// 收到 answer 之后 发送 candidate
   /// TODO: 需要和 streamId 关联
   LOG(INFO) << ">>>>>>>>>>>>>>>>>OnSubscribeStream===" << msg;
-  auto json = nlohmann::json::parse(msg);
-  erizoId = json[1];
-  connId = json[2];
+  worker_->PostTask(SafeTask([msg](const std::shared_ptr<LicodeRoom>& room) {
+    auto streamId = room->pending_subscribe_streams_.front();
+    room->pending_subscribe_streams_.pop();
+    auto json = nlohmann::json::parse(msg);
+    if (room->erizo_id_.empty()) {
+      room->erizo_id_ = json[1];
+    } else if (room->erizo_id_ != json[1]) {
+      LOG(WARNING) << ">>>>>> stream " << streamId << " erizoId:" << json[1]
+                   << ", but others erizoId:" << room->erizo_id_;
+    }
+    room->stream_infos_[streamId]->SetConnectionId(json[2]);
+  }));
+
 }
 
 void LicodeRoom::OnErizoConnectionEvent(const std::string& msg) {
@@ -197,6 +212,7 @@ void LicodeRoom::OnErizoConnectionEvent(const std::string& msg) {
   /// 1. receive info:202, type CONN_SDP
   /// 2. receive info:104  type CONN_READY
   /// 3. receive info:150  type CONN_QUALITY_LEVEL
+  /// 4. receive info:500  type failed
 
   auto event = nlohmann::json::parse(msg);
   std::string connectionId = event["connectionId"];
@@ -214,11 +230,25 @@ void LicodeRoom::OnErizoConnectionEvent(const std::string& msg) {
       LOG(INFO) << ">>>>> receive quality_level";
       break;
     case 104:
+      OnPeerConnectionConnectErizoReady(connectionId);
+      break;
+    case 500:
+      LOG(INFO) << ">>>>> receive unknown erizo connection event";
       break;
     default:
       LOG(INFO) << ">>>>> receive unknown erizo connection event";
   }
 
+}
+
+void LicodeRoom::OnPeerConnectionConnectErizoReady(const std::string& connId) {
+  worker_->PostTask(SafeTask([connId](const std::shared_ptr<LicodeRoom>& room){
+    for (const auto& info: room->stream_infos_) {
+      if (info.second->ConnectionId() == connId) {
+        info.second->SetConnected(true);
+      }
+    }
+  }));
 }
 
 void LicodeRoom::PublishStream() {
@@ -234,13 +264,19 @@ void LicodeRoom::receiveOffer(const std::string& connId, const std::string& sdp)
     LOG(ERROR) << ">>>>>>>>>> CreateSessionDescription error:" << error.description;
     return;
   }
-  auto it = peer_connections_.begin();
-  rtc::scoped_refptr<rtc::RefCountedObject<WebrtcConnection>> pc = it->second;
-  it->second->SetRemoteDescription(std::move(sessionDescription));
-  webrtc::PeerConnectionInterface::RTCOfferAnswerOptions options;
-  options.offer_to_receive_audio = 1;
-  options.offer_to_receive_video = 1;
-  it->second->CreateAnswer(options);
+  worker_->PostTask(SafeTask([connId, sd = sessionDescription.release()](const std::shared_ptr<LicodeRoom>& room) {
+    uint64_t streamId = 0;
+    for (const auto& info: room->stream_infos_) {
+      if (info.second->ConnectionId() == connId)
+        streamId = info.second->Id();
+    }
+    room->peer_connections_[streamId]->SetRemoteDescription(std::unique_ptr<webrtc::SessionDescriptionInterface>(sd));
+    webrtc::PeerConnectionInterface::RTCOfferAnswerOptions options;
+    /// for suppoer plan-b
+    options.offer_to_receive_audio = 1;
+    options.offer_to_receive_video = 1;
+    room->peer_connections_[streamId]->CreateAnswer(options);
+  }));
 
 }
 
@@ -254,39 +290,64 @@ void LicodeRoom::CreateSubscribePeerConnection(uint64_t streamId) {
   }
   webrtc::PeerConnectionInterface::RTCConfiguration config;
   config.sdp_semantics = webrtc::SdpSemantics::kPlanB;
-//  config.sdp_semantics = webrtc::SdpSemantics::kUnifiedPlan;
   config.enable_dtls_srtp = true;
-  webrtc::PeerConnectionInterface::IceServer server;
-  server.uri = "stun:stun.l.google.com:19302";
-  config.servers.push_back(server);
+  config.type = webrtc::PeerConnectionInterface::kNoHost; /// kRelay, kNoHost, kAll
+  for (const auto& ice: ice_server_list_) {
+    webrtc::PeerConnectionInterface::IceServer server;
+    server.uri = ice.url;
+    server.username = ice.username;
+    server.password = ice.credential;
+    config.servers.push_back(server);
+  }
   peer_connections_[streamId] =
       rtc::scoped_refptr<rtc::RefCountedObject<WebrtcConnection>>(new rtc::RefCountedObject<WebrtcConnection>(config));
 
-  /// TODO: fixme
+
   peer_connections_[streamId]->SetSdpCreateSuccessCallback(
       [this, streamId](webrtc::SdpType type, const std::string& sdp) {
-          webrtc::SdpParseError error;
-          auto sessionDescription = WebrtcWrapper::CreateSessionDescription(webrtc::SdpType::kAnswer, sdp,
-                                                                                        &error);
-          if (!sessionDescription) {
-            LOG(ERROR) << ">>>>>>>>>> CreateSessionDescription error:" << error.description;
-            return;
-          }
-          this->peer_connections_[streamId]->SetLocalDescription(std::move(sessionDescription));
-          auto pkt = LicodeSignalingPktCreator::CreateOfferOrAnswerPkt(false, erizoId, connId, sdp, 300);
-          signaling_->SendMsg("422" + pkt);
+        webrtc::SdpParseError error;
+        auto sessionDescription = WebrtcWrapper::CreateSessionDescription(webrtc::SdpType::kAnswer, sdp,
+                                                                          &error);
+        if (!sessionDescription) {
+          LOG(ERROR) << ">>>>>>>>>> CreateSessionDescription error:" << error.description;
+          return;
+        }
+        worker_->PostTask(
+            SafeTask([streamId, sdp, sd = sessionDescription.release()](const std::shared_ptr<LicodeRoom>& room) {
+              room->peer_connections_[streamId]->SetLocalDescription(
+                  std::unique_ptr<webrtc::SessionDescriptionInterface>(sd));
+              auto pkt = LicodeSignalingPktCreator::CreateOfferOrAnswerPkt(false, room->erizo_id_,
+                                                                           room->stream_infos_[streamId]->ConnectionId(),
+                                                                           sdp, 300);
+              /// room->signaling_->SendMsg("422" + pkt);
+              room->signaling_->SendMsg(LicodeSignaling::EventHeader() + pkt);
+            }));
       });
 
-  peer_connections_[streamId]->SetIceCandidateCallback([this](const webrtc::IceCandidateInterface* candidate) {
-    std::string out;
-    candidate->ToString(&out);
-    LOG(INFO) << ">>>>>>++++++++++++++candidate sdp_mid:" << candidate->sdp_mid();
-    LOG(INFO) << ">>>>>>++++++++++++++candidate sdp_mline_index:" << candidate->sdp_mline_index();
-    auto msg = LicodeSignalingPktCreator::CreateConnectionCandidateMsg(candidate->sdp_mline_index(),
-        candidate->sdp_mid(), "a=" + out);
-    auto pkt = LicodeSignalingPktCreator::CreateConnectionPtk(connId, erizoId, msg);
-    signaling_->SendMsg("42" + pkt);
-  });
+  peer_connections_[streamId]->SetIceCandidateCallback(
+      [this, streamId](const webrtc::IceCandidateInterface* candidate) {
+        std::string out;
+        candidate->ToString(&out);
+        auto mid = candidate->sdp_mid();
+        auto index = candidate->sdp_mline_index();
+        auto candidateAttribute = "a=" + out;
+        worker_->PostTask(SafeTask([mid, index, candidateAttribute, streamId](const std::shared_ptr<LicodeRoom>& room) {
+          auto msg = LicodeSignalingPktCreator::CreateConnectionCandidateMsg(index, mid, candidateAttribute);
+          auto pkt = LicodeSignalingPktCreator::CreateConnectionPtk(room->stream_infos_[streamId]->ConnectionId(),
+                                                                    room->erizo_id_, msg);
+          room->signaling_->SendMsg(LicodeSignaling::EventHeader() + pkt);
+        }));
+      });
+}
+
+std::function<void()> LicodeRoom::SafeTask(const std::function<void(std::shared_ptr<LicodeRoom>)>& function) {
+  auto weakSelf = weak_from_this();
+  return [weakSelf, function]() {
+    auto self = weakSelf.lock();
+    if (self) {
+      function(self);
+    }
+  };
 }
 
 }
