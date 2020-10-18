@@ -69,6 +69,10 @@ void WebrtcConnection::SetIceCandidateCallback(WebrtcConnection::OnIceCandidateC
   ice_candidate_callback_ = std::move(callback);
 }
 
+void WebrtcConnection::SetPeerConnectionConnectCallback(WebrtcConnection::OnPeerConnectCallback callback) {
+  peer_connect_callback_ = std::move(callback);
+}
+
 void WebrtcConnection::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
   std::string out;
   desc->ToString(&out);
@@ -114,6 +118,17 @@ void WebrtcConnection::OnIceConnectionChange(webrtc::PeerConnectionInterface::Ic
 void WebrtcConnection::OnConnectionChange(webrtc::PeerConnectionInterface::PeerConnectionState new_state) {
   LOG(INFO) << ">>>>>>WebrtcConnection OnConnectionChange:"
             << WebrtcWrapper::PeerConnectionStateToString(static_cast<int>(new_state));
+
+  std::optional<bool> connected;
+  if (new_state == webrtc::PeerConnectionInterface::PeerConnectionState::kConnected) {
+    connected = true;
+  } else if (new_state == webrtc::PeerConnectionInterface::PeerConnectionState::kDisconnected) {
+    connected = false;
+  }
+
+  if (connected.has_value() && peer_connect_callback_) {
+    peer_connect_callback_(connected.value());
+  }
 }
 
 void WebrtcConnection::OnIceConnectionReceivingChange(bool receiving) {

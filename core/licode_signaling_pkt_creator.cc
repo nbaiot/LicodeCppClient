@@ -56,6 +56,17 @@ std::string LicodeSignalingPktCreator::CreateSubscribeStreamPkt(uint64_t streamI
   return subscribeJson.dump();
 }
 
+std::string LicodeSignalingPktCreator::CreateUnsubscribeStreamPkt(uint64_t streamId) {
+  auto unsubscribeJson = nlohmann::json::array();
+  unsubscribeJson[0] = "unsubscribe";
+  nlohmann::json stream;
+  stream["id"] = streamId;
+
+  unsubscribeJson[1] = streamId;
+  unsubscribeJson[2] = nlohmann::json::value_t::null;
+  return unsubscribeJson.dump();
+}
+
 std::string LicodeSignalingPktCreator::CreateConnectionOfferMsg(const std::string& sdp, int maxVideoBW) {
   nlohmann::json msg;
   msg["type"] = "offer";

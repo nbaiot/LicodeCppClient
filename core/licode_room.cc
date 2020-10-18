@@ -61,11 +61,20 @@ void LicodeRoom::Leave() {
 }
 
 void LicodeRoom::SubscribeStream(uint64_t streamId) {
+  /// erizoClient/src/Room.js
   worker_->PostTask(SafeTask([streamId](const std::shared_ptr<LicodeRoom>& room) {
     LOG(INFO) << ">>>>>>>>>>>>>>>> start subscribe stream id:" << streamId;
     auto pkt = LicodeSignalingPktCreator::CreateSubscribeStreamPkt(streamId);
     room->pending_subscribe_streams_.push(streamId);
-    room->signaling_->SendMsg(room->signaling_->SubscribeStreamMsgHeader() + pkt);
+    room->signaling_->SendMsg(LicodeSignaling::SubscribeStreamMsgHeader() + pkt);
+  }));
+}
+
+void LicodeRoom::UnSubscriberStream(uint64_t streamId) {
+  worker_->PostTask(SafeTask([streamId](const std::shared_ptr<LicodeRoom>& room) {
+    auto pkt = LicodeSignalingPktCreator::CreateUnsubscribeStreamPkt(streamId);
+    LOG(INFO) << ">>>>>>>>>>>>>>>> start unsubscribe stream id:" << pkt;
+    room->signaling_->SendMsg(LicodeSignaling::EventHeader() + pkt);
   }));
 }
 
@@ -157,11 +166,12 @@ void LicodeRoom::OnAddStream(const std::string& msg) {
         stream["label"], stream["screen"],
         /// TODO: fixme
         stream["attributes"].dump());
-    stream_infos_[stream["id"]] = info;
-    LOG(INFO) << "add stream:" << stream["id"];
-
-    CreateSubscribePeerConnection(stream["id"]);
-    SubscribeStream(stream["id"]);
+    worker_->PostTask(SafeTask([info](const std::shared_ptr<LicodeRoom>& room) {
+      LOG(INFO) << "add stream:" << info->Id();
+      room->stream_infos_[info->Id()] = info;
+      room->CreateSubscribePeerConnection(info->Id());
+      room->SubscribeStream(info->Id());
+    }));
 
   } catch (const std::exception& e) {
     LOG(WARNING) << ">>>>>>>>>>>OnAddStream error:" << e.what();
@@ -172,11 +182,13 @@ void LicodeRoom::OnRemoveStream(const std::string& msg) {
   try {
     auto body = nlohmann::json::parse(msg);
     uint64_t removeStreamId = body["id"];
-    auto it = stream_infos_.find(removeStreamId);
-    if (it != stream_infos_.end()) {
-      stream_infos_.erase(it);
-    }
-    LOG(INFO) << ">>>>>>>>>> remove stream:" << removeStreamId;
+    worker_->PostTask(SafeTask([removeStreamId](const std::shared_ptr<LicodeRoom>& room) {
+      LOG(INFO) << ">>>>>>>>>> remove stream:" << removeStreamId;
+      auto it = room->stream_infos_.find(removeStreamId);
+      if (it != room->stream_infos_.end()) {
+        room->stream_infos_.erase(it);
+      }
+    }));
   } catch (const std::exception& e) {
     LOG(WARNING) << ">>>>>>>>>>>OnRemoveStream error:" << e.what();
   }
@@ -233,7 +245,7 @@ void LicodeRoom::OnErizoConnectionEvent(const std::string& msg) {
       OnPeerConnectionConnectErizoReady(connectionId);
       break;
     case 500:
-      LOG(INFO) << ">>>>> receive unknown erizo connection event";
+      LOG(INFO) << ">>>>> receive erizo connection error event";
       break;
     default:
       LOG(INFO) << ">>>>> receive unknown erizo connection event";
@@ -242,13 +254,26 @@ void LicodeRoom::OnErizoConnectionEvent(const std::string& msg) {
 }
 
 void LicodeRoom::OnPeerConnectionConnectErizoReady(const std::string& connId) {
-  worker_->PostTask(SafeTask([connId](const std::shared_ptr<LicodeRoom>& room){
-    for (const auto& info: room->stream_infos_) {
-      if (info.second->ConnectionId() == connId) {
-        info.second->SetConnected(true);
-      }
-    }
+//  worker_->PostTask(SafeTask([connId](const std::shared_ptr<LicodeRoom>& room) {
+//    for (const auto& info: room->stream_infos_) {
+//      if (info.second->ConnectionId() == connId) {
+//        info.second->SetConnected(true);
+//      }
+//    }
+//  }));
+}
+
+void LicodeRoom::OnPeerConnectionConnectChange(uint64_t streamId, bool connect) {
+  worker_->PostTask(SafeTask([streamId, connect](const std::shared_ptr<LicodeRoom>& room) {
+    auto info = room->stream_infos_[streamId];
+    if (!info)
+      return;
+    LOG(INFO) << ">>>>>>>>>>>>>>>>>>>>>>>>streamId " << streamId << " peer connected:" << connect;
+    info->SetConnected(connect);
+    /// TODO: remove peer if disconnect?
   }));
+
+
 }
 
 void LicodeRoom::PublishStream() {
@@ -264,7 +289,7 @@ void LicodeRoom::receiveOffer(const std::string& connId, const std::string& sdp)
     LOG(ERROR) << ">>>>>>>>>> CreateSessionDescription error:" << error.description;
     return;
   }
-  worker_->PostTask(SafeTask([connId, sd = sessionDescription.release()](const std::shared_ptr<LicodeRoom>& room) {
+  worker_->PostTask(SafeTask([connId, sdp, sd = sessionDescription.release()](const std::shared_ptr<LicodeRoom>& room) {
     uint64_t streamId = 0;
     for (const auto& info: room->stream_infos_) {
       if (info.second->ConnectionId() == connId)
@@ -338,6 +363,10 @@ void LicodeRoom::CreateSubscribePeerConnection(uint64_t streamId) {
           room->signaling_->SendMsg(LicodeSignaling::EventHeader() + pkt);
         }));
       });
+
+  peer_connections_[streamId]->SetPeerConnectionConnectCallback([this, streamId](bool connect) {
+    OnPeerConnectionConnectChange(streamId, connect);
+  });
 }
 
 std::function<void()> LicodeRoom::SafeTask(const std::function<void(std::shared_ptr<LicodeRoom>)>& function) {

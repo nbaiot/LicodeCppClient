@@ -17,6 +17,8 @@ public:
 
   static std::string CreateSubscribeStreamPkt(uint64_t streamId);
 
+  static std::string CreateUnsubscribeStreamPkt(uint64_t streamId);
+
   /// TODO: fixme config
   static std::string CreateConnectionOfferMsg(const std::string& sdp, int maxVideoBW);
 

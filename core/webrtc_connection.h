@@ -22,6 +22,8 @@ public:
 
   using OnIceCandidateCallback = std::function<void(const webrtc::IceCandidateInterface* candidate)>;
 
+  using OnPeerConnectCallback = std::function<void(bool connected)>;
+
   explicit WebrtcConnection(const webrtc::PeerConnectionInterface::RTCConfiguration& config);
 
   void SetLocalDescription(std::unique_ptr<webrtc::SessionDescriptionInterface> desc);
@@ -35,6 +37,8 @@ public:
   void SetSdpCreateSuccessCallback(OnSdpCreateSuccessCallback callback);
 
   void SetIceCandidateCallback(OnIceCandidateCallback callback);
+
+  void SetPeerConnectionConnectCallback(OnPeerConnectCallback callback);
 
   /// TODO: add AttachVideoRenders(多个 render) and AttachAudioRender
 
@@ -78,6 +82,7 @@ private:
 
   OnSdpCreateSuccessCallback sdp_create_success_callback_;
   OnIceCandidateCallback ice_candidate_callback_;
+  OnPeerConnectCallback peer_connect_callback_;
 };
 
 }

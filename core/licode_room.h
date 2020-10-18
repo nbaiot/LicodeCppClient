@@ -54,7 +54,7 @@ public:
   /// TODO: audio, video, data
   void SubscribeStream(uint64_t streamId);
 
-  void UnSubscriberStream();
+  void UnSubscriberStream(uint64_t streamId);
 
   void LocalStreams();
 
@@ -85,6 +85,8 @@ private:
 
   void OnPeerConnectionConnectErizoReady(const std::string& connId);
 
+  void OnPeerConnectionConnectChange(uint64_t streamId, bool connect);
+
   void receiveOffer(const std::string& connId, const std::string& sdp);
 
   void receiveAnswer(const std::string& connId, const std::string& sdp);
@@ -109,11 +111,10 @@ private:
   /// TODO: map must be operation at worker thread
   std::unordered_map<uint64_t, std::shared_ptr<LicodeStreamInfo>> stream_infos_;
   std::unordered_map<uint64_t, rtc::scoped_refptr<rtc::RefCountedObject<WebrtcConnection>>> peer_connections_;
-
+  std::queue<uint64_t> pending_subscribe_streams_;
 
 
   std::unique_ptr<LicodeSignaling> signaling_;
-  std::queue<uint64_t> pending_subscribe_streams_;
   OnJoinRoomCallback join_room_callback_;
 
 };

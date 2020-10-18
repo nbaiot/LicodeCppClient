@@ -8,7 +8,7 @@
 namespace nbaiot {
 
 void VideoRender::OnFrame(const webrtc::VideoFrame& frame) {
-  LOG(INFO) << ">>>>> receive frame:" << frame.width() << "*" << frame.height();
+  LOG_EVERY_N(INFO, 25) << ">>>>> receive frame:" << frame.width() << "*" << frame.height();
 }
 
 }
