@@ -49,7 +49,7 @@ public:
 
   void Leave();
 
-  void PublishStream(const LicodeStreamInfo& info);
+  void PublishStream(const std::shared_ptr<LicodeStreamInfo>& info);
 
   void UnPublishStream(uint64_t streamId);
 
@@ -112,7 +112,7 @@ private:
 
   void receiveAnswer(const std::string& connId, const std::string& sdp);
 
-  void CreateSubscribePeerConnection(uint64_t streamId);
+  void CreatePeerConnection(uint64_t streamId);
 
   std::function<void()> SafeTask(const std::function<void(std::shared_ptr<LicodeRoom>)>& function);
 
@@ -134,6 +134,7 @@ private:
   std::unordered_map<uint64_t, std::shared_ptr<LicodeStreamInfo>> remote_stream_infos_;
   std::unordered_map<uint64_t, std::unique_ptr<WebrtcConnection>> peer_connections_;
   std::queue<uint64_t> pending_subscribe_streams_;
+  std::queue<std::shared_ptr<LicodeStreamInfo>> pending_publish_local_streams_;
 
 
   std::unique_ptr<LicodeSignaling> signaling_;

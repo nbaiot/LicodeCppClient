@@ -48,17 +48,17 @@ std::string PublicStreamPktBuilder::Build() {
   return publishJson.dump();
 }
 
-updateStreamAttributesPktBuilder& updateStreamAttributesPktBuilder::SetStreamId(uint64_t streamId) {
+UpdateStreamAttributesPktBuilder& UpdateStreamAttributesPktBuilder::SetStreamId(uint64_t streamId) {
   stream_id_ = streamId;
   return *this;
 }
 
-updateStreamAttributesPktBuilder& updateStreamAttributesPktBuilder::SetTypeAttr(std::string type) {
+UpdateStreamAttributesPktBuilder& UpdateStreamAttributesPktBuilder::SetTypeAttr(std::string type) {
   type_attr_ = std::move(type);
   return *this;
 }
 
-std::string updateStreamAttributesPktBuilder::Build() {
+std::string UpdateStreamAttributesPktBuilder::Build() {
   auto updateAttrJson = nlohmann::json::array();
   updateAttrJson[0] = "updateStreamAttributes";
 

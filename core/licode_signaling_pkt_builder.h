@@ -34,11 +34,11 @@ private:
   int max_video_bw_{300};
 };
 
-class updateStreamAttributesPktBuilder {
+class UpdateStreamAttributesPktBuilder {
 public:
-  updateStreamAttributesPktBuilder& SetStreamId(uint64_t streamId);
+  UpdateStreamAttributesPktBuilder& SetStreamId(uint64_t streamId);
 
-  updateStreamAttributesPktBuilder& SetTypeAttr(std::string type);
+  UpdateStreamAttributesPktBuilder& SetTypeAttr(std::string type);
 
   std::string Build();
 
