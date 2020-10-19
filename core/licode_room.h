@@ -39,7 +39,7 @@ public:
 
   explicit LicodeRoom(std::shared_ptr<Worker> worker, LicodeToken token);
 
-  ~LicodeRoom();
+  ~LicodeRoom() override;
 
   std::string Id();
 
@@ -49,9 +49,9 @@ public:
 
   void Leave();
 
-  void PublishStream();
+  void PublishStream(const LicodeStreamInfo& info);
 
-  void UnPublishStream();
+  void UnPublishStream(uint64_t streamId);
 
   /// TODO: audio, video, data
   void SubscribeStream(uint64_t streamId);
@@ -101,6 +101,8 @@ private:
   void OnRemoveStream(const std::string& msg);
 
   void OnSubscribeStream(const std::string& msg);
+
+  void OnPublishStream(const std::string& msg);
 
   void OnErizoConnectionEvent(const std::string& msg);
 

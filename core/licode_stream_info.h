@@ -26,13 +26,27 @@ public:
 
   }
 
+  LicodeStreamInfo(bool hasVideo,
+                   bool hasAudio,
+                   bool hasData,
+                   std::string label,
+                   bool screen,
+                   std::string attributes)
+      : LicodeStreamInfo(0, hasAudio, hasAudio, hasData, std::move(label), screen, std::move(attributes)) {
+
+  }
+
   LicodeStreamInfo() : LicodeStreamInfo(0, false, false, false, "", false, "") {}
+
+  void SetId(uint64_t id) {
+    id_ = id;
+  }
 
   uint64_t Id() {
     return id_;
   }
 
-  std::string Label() {
+  std::string Label() const {
     return label_;
   }
 
@@ -72,9 +86,7 @@ public:
     return connected_;
   }
 
-
-
-public:
+private:
   uint64_t id_;
   bool has_video_;
   bool has_audio_;

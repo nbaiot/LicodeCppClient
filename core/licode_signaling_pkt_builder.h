@@ -76,7 +76,7 @@ public:
   std::string Build();
 
 private:
-  uint64_t stream_id_;
+  uint64_t stream_id_{0};
 };
 
 class OfferOrAnswerPktBuilder {

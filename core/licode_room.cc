@@ -29,6 +29,9 @@ LicodeRoom::LicodeRoom(std::shared_ptr<Worker> worker, LicodeToken token)
   signaling_->SetOnSubscribeCallback([this](const std::string& msg) {
       OnSubscribeStream(msg);
   });
+  signaling_->SetOnPublishCallback([this](const std::string& msg) {
+      OnPublishStream(msg);
+  });
 }
 
 
@@ -60,6 +63,26 @@ void LicodeRoom::Leave() {
   }
   signaling_->Dispose();
 }
+
+void LicodeRoom::PublishStream(const LicodeStreamInfo& info) {
+  PublicStreamPktBuilder builder;
+  /// TODO: fixme p2p
+  auto pkt = builder.SetLabel(info.Label()).SetState("erizo").Build();
+
+  worker_->PostTask(SafeTask([pkt](const std::shared_ptr<LicodeRoom>& room) {
+      room->signaling_->SendMsg(LicodeSignaling::PublishStreamMsgHeader() + pkt);
+  }));
+
+}
+
+void LicodeRoom::UnPublishStream(uint64_t streamId) {
+  UnsubscribeStreamPktBuilder builder;
+  auto pkt = builder.SetStreamId(streamId).Build();
+  worker_->PostTask(SafeTask([pkt](const std::shared_ptr<LicodeRoom>& room) {
+      room->signaling_->SendMsg(LicodeSignaling::EventHeader() + pkt);
+  }));
+}
+
 
 void LicodeRoom::SubscribeStream(uint64_t streamId) {
   /// erizoClient/src/Room.js
@@ -222,6 +245,10 @@ void LicodeRoom::OnSubscribeStream(const std::string& msg) {
 
 }
 
+void LicodeRoom::OnPublishStream(const std::string& msg) {
+
+}
+
 void LicodeRoom::OnErizoConnectionEvent(const std::string& msg) {
   /// erizoJS/models/Connection.js
   /// 1. receive info:202, type CONN_SDP
@@ -264,11 +291,6 @@ void LicodeRoom::OnPeerConnectionConnectErizoReady(const std::string& connId) {
 //      }
 //    }
 //  }));
-}
-
-void LicodeRoom::PublishStream() {
-  /// 首先更新 stream 属性
-  /// ["onUpdateAttributeStream",{"id":903077823469367800,"attrs":{"type":"publisher"}}]
 }
 
 void LicodeRoom::receiveOffer(const std::string& connId, const std::string& sdp) {

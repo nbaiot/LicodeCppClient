@@ -43,6 +43,10 @@ static const int64_t SUBSCRIBE_STREAM_TRANS_IS = 222;
 static const std::string SUBSCRIBE_STREAM_RESPONSE =
     SOCKET_IO_MESSAGE + SOCKET_IO_PACKET_ACK + std::to_string(SUBSCRIBE_STREAM_TRANS_IS);
 
+static const int64_t PUBLISH_STREAM_TRANS_IS = 333;
+static const std::string PUBLISH_STREAM_RESPONSE =
+    SOCKET_IO_MESSAGE + SOCKET_IO_PACKET_ACK + std::to_string(PUBLISH_STREAM_TRANS_IS);
+
 LicodeSignaling::LicodeSignaling(std::shared_ptr<Worker> worker)
     : state_(kDisconnect), ping_interval_ms_(25000),
       ping_timeout_ms_(60000),
@@ -131,6 +135,8 @@ void LicodeSignaling::OnWebsocketMsg(const std::string& msg) {
     ProcessDisconnect();
   } else if (number == SUBSCRIBE_STREAM_RESPONSE) {
     ProcessSubscribeStream(msg.substr(SUBSCRIBE_STREAM_RESPONSE.length()));
+  } else if (number == PUBLISH_STREAM_RESPONSE) {
+    ProcessPublishStream(msg.substr(PUBLISH_STREAM_RESPONSE.length()));
   } else if (number == SOCKET_IO_WEBSOCKET_EVENT) {
     ProcessEvent(msg.substr(SOCKET_IO_WEBSOCKET_EVENT.length()));
   }
@@ -139,6 +145,12 @@ void LicodeSignaling::OnWebsocketMsg(const std::string& msg) {
 void LicodeSignaling::ProcessSubscribeStream(const std::string& msg) {
   if (subscribe_stream_callback_) {
     subscribe_stream_callback_(msg);
+  }
+}
+
+void LicodeSignaling::ProcessPublishStream(const std::string& msg) {
+  if (publish_stream_callback_) {
+    publish_stream_callback_(msg);
   }
 }
 
@@ -225,10 +237,20 @@ void LicodeSignaling::SetOnSubscribeCallback(LicodeSignaling::OnSubscribeStreamC
   subscribe_stream_callback_ = std::move(callback);
 }
 
+void LicodeSignaling::SetOnPublishCallback(LicodeSignaling::OnPublishStreamCallback callback) {
+  publish_stream_callback_ = std::move(callback);
+}
+
 std::string LicodeSignaling::SubscribeStreamMsgHeader() {
   return SOCKET_IO_MESSAGE +
          SOCKET_IO_PACKET_EVENT +
          std::to_string(SUBSCRIBE_STREAM_TRANS_IS);
+}
+
+std::string LicodeSignaling::PublishStreamMsgHeader() {
+  return SOCKET_IO_MESSAGE +
+         SOCKET_IO_PACKET_EVENT +
+         std::to_string(PUBLISH_STREAM_TRANS_IS);
 }
 
 std::string LicodeSignaling::EventHeader() {

@@ -30,6 +30,8 @@ public:
 
   using OnSubscribeStreamCallback = std::function<void(const std::string&)>;
 
+  using OnPublishStreamCallback = std::function<void(const std::string&)>;
+
   explicit LicodeSignaling(std::shared_ptr<Worker> worker);
 
   enum State {
@@ -52,11 +54,15 @@ public:
 
   void SetOnSubscribeCallback(OnSubscribeStreamCallback callback);
 
+  void SetOnPublishCallback(OnPublishStreamCallback callback);
+
   State CurrentState();
 
   void SendMsg(const std::string& msg);
 
   static std::string SubscribeStreamMsgHeader();
+
+  static std::string PublishStreamMsgHeader();
 
   static std::string EventHeader();
 
@@ -86,6 +92,8 @@ private:
 
   void ProcessSubscribeStream(const std::string& msg);
 
+  void ProcessPublishStream(const std::string& msg);
+
   void ProcessEvent(const std::string& msg);
 
 private:
@@ -101,6 +109,7 @@ private:
   OnDisconnectCallback disconnect_callback_;
   OnEventCallback event_callback_;
   OnSubscribeStreamCallback subscribe_stream_callback_;
+  OnPublishStreamCallback publish_stream_callback_;
 };
 
 }
