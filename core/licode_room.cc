@@ -4,7 +4,7 @@
 
 #include "licode_room.h"
 #include "licode_signaling.h"
-#include "licode_signaling_pkt_creator.h"
+#include "licode_signaling_pkt_builder.h"
 #include "webrtc_wrapper.h"
 #include "thread/worker.h"
 #include "video_render.h"
@@ -65,7 +65,9 @@ void LicodeRoom::SubscribeStream(uint64_t streamId) {
   /// erizoClient/src/Room.js
   worker_->PostTask(SafeTask([streamId](const std::shared_ptr<LicodeRoom>& room) {
       LOG(INFO) << ">>>>>>>>>>>>>>>> start subscribe stream id:" << streamId;
-      auto pkt = LicodeSignalingPktCreator::CreateSubscribeStreamPkt(streamId);
+
+      SubscribeStreamPktBuilder builder;
+      auto pkt = builder.SetStreamId(streamId).SetOfferFromErizo(true).Build();
       room->pending_subscribe_streams_.push(streamId);
       room->signaling_->SendMsg(LicodeSignaling::SubscribeStreamMsgHeader() + pkt);
   }));
@@ -73,7 +75,8 @@ void LicodeRoom::SubscribeStream(uint64_t streamId) {
 
 void LicodeRoom::UnSubscriberStream(uint64_t streamId) {
   worker_->PostTask(SafeTask([streamId](const std::shared_ptr<LicodeRoom>& room) {
-      auto pkt = LicodeSignalingPktCreator::CreateUnsubscribeStreamPkt(streamId);
+      UnsubscribeStreamPktBuilder builder;
+      auto pkt = builder.SetStreamId(streamId).Build();
       LOG(INFO) << ">>>>>>>>>>>>>>>> start unsubscribe stream id:" << pkt;
       room->signaling_->SendMsg(LicodeSignaling::EventHeader() + pkt);
   }));
@@ -342,9 +345,12 @@ void LicodeRoom::OnSdpCreateSuccess(WebrtcConnection* peer, webrtc::SdpType type
               } else if (room->local_stream_infos_[streamId]) {
                 connId = room->local_stream_infos_[streamId]->ConnectionId();
               }
-              auto pkt = LicodeSignalingPktCreator::CreateOfferOrAnswerPkt(false, room->erizo_id_,
-                                                                           connId,
-                                                                           sdp, 300);
+              OfferOrAnswerPktBuilder builder;
+              builder.SetType("offer")
+                  .SetConnId(connId)
+                  .SetErizoId(room->erizo_id_)
+                  .SetSdp(sdp);
+              auto pkt = builder.Build();
               room->signaling_->SendMsg(LicodeSignaling::EventHeader() + pkt);
           }));
 }
@@ -363,10 +369,14 @@ void LicodeRoom::OnIceCandidate(WebrtcConnection* peer, const webrtc::IceCandida
           } else if (room->local_stream_infos_[streamId]) {
             connId = room->local_stream_infos_[streamId]->ConnectionId();
           }
-          auto msg = LicodeSignalingPktCreator::CreateConnectionCandidateMsg(index, mid, candidateAttribute);
-          auto pkt = LicodeSignalingPktCreator::CreateConnectionPtk(
-              connId,
-              room->erizo_id_, msg);
+          ConnectionPtkBuilder builder;
+          builder.SetErizoId(room->erizo_id_)
+              .SetConnId(connId)
+              .SetSdpMid(mid)
+              .SetSdpMLineIndex(index)
+              .SetCandidate_(candidateAttribute);
+
+          auto pkt = builder.Build();
           room->signaling_->SendMsg(LicodeSignaling::EventHeader() + pkt);
       }));
 }

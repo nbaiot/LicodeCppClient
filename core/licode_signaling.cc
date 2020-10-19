@@ -11,7 +11,7 @@
 #include "thread/worker.h"
 #include "messenger/websocket_session.h"
 #include "licode_signaling_pkt_parser.h"
-#include "licode_signaling_pkt_creator.h"
+#include "licode_signaling_pkt_builder.h"
 
 namespace nbaiot {
 
@@ -63,13 +63,13 @@ bool LicodeSignaling::Init(LicodeToken token) {
   signaling_url_ = "ws://" + token_.host + "/socket.io/?EIO=3&transport=websocket";
   websocket_ = std::make_shared<WebsocketSession>(signaling_url_);
   websocket_->SetOnReadyCallback([this]() {
-    OnWebsocketConnectCallback();
+      OnWebsocketConnectCallback();
   });
   websocket_->SetOnReceiveMsgCallback([this](const std::string& msg) {
-    OnWebsocketMsg(msg);
+      OnWebsocketMsg(msg);
   });
   websocket_->SetOnAbnormalDisconnectCallback([this](const std::string& reason) {
-    OnWebsocketDisconnect(reason);
+      OnWebsocketDisconnect(reason);
   });
 
   UpdateState(kConnecting);
@@ -148,19 +148,23 @@ void LicodeSignaling::OnWebsocketDisconnect(const std::string& reason) {
 }
 
 void LicodeSignaling::InitToken(bool singlePC) {
-  std::string sendPkt =
-      std::move(LicodeSignalingPktCreator::CreateTokenPkt(singlePC, token_));
+  CreateTokenPtkBuilder builder;
+  builder.SetTokenId(token_.tokenId)
+      .SetHost(token_.host)
+      .SetSecure(token_.secure)
+      .SetSignature(token_.signature)
+      .SetSinglePC(singlePC);
 
   websocket_->SendMsg(SOCKET_IO_MESSAGE +
                       SOCKET_IO_PACKET_EVENT +
                       std::to_string(INIT_TOKEN_TRANS_ID) +
-                      sendPkt);
+                      builder.Build());
 }
 
 void LicodeSignaling::KeepAlive() {
   worker_->ScheduleEvery([this]() -> bool {
-    LOG(INFO) << ">>>>>>>>>> send ping";
-    return SocketIoPing();
+      LOG(INFO) << ">>>>>>>>>> send ping";
+      return SocketIoPing();
   }, std::chrono::milliseconds(ping_interval_ms_));
 }
 
