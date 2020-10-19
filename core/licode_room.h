@@ -106,8 +106,6 @@ private:
 
   void OnPeerConnectionConnectErizoReady(const std::string& connId);
 
-  void OnPeerConnectionConnectChange(uint64_t streamId, bool connect);
-
   void receiveOffer(const std::string& connId, const std::string& sdp);
 
   void receiveAnswer(const std::string& connId, const std::string& sdp);
@@ -130,7 +128,8 @@ private:
   std::vector<IceServer> ice_server_list_;
 
   /// must be operation at worker thread
-  std::unordered_map<uint64_t, std::shared_ptr<LicodeStreamInfo>> stream_infos_;
+  std::unordered_map<uint64_t, std::shared_ptr<LicodeStreamInfo>> local_stream_infos_;
+  std::unordered_map<uint64_t, std::shared_ptr<LicodeStreamInfo>> remote_stream_infos_;
   std::unordered_map<uint64_t, std::unique_ptr<WebrtcConnection>> peer_connections_;
   std::queue<uint64_t> pending_subscribe_streams_;
 
