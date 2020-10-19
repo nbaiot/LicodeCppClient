@@ -5,26 +5,23 @@
 #ifndef LICODECPPCLIENT_WEBRTC_CONNECTION_H
 #define LICODECPPCLIENT_WEBRTC_CONNECTION_H
 
-#include <functional>
-
+#include <boost/noncopyable.hpp>
 #include "api/peer_connection_interface.h"
+#include "webrtc_peer_connection_observer.h"
 
 namespace nbaiot {
 
-/// TODO: 对外提供 observer 代替大量单一设置 callback
-
 class WebrtcConnection : public webrtc::PeerConnectionObserver,
-                         public webrtc::CreateSessionDescriptionObserver {
+                         public boost::noncopyable {
 
 public:
 
-  using OnSdpCreateSuccessCallback = std::function<void(webrtc::SdpType type, const std::string& sdp)>;
+  WebrtcConnection(uint64_t id, WebrtcPeerConnectionObserver* observer,
+                   const webrtc::PeerConnectionInterface::RTCConfiguration& config);
 
-  using OnIceCandidateCallback = std::function<void(const webrtc::IceCandidateInterface* candidate)>;
-
-  using OnPeerConnectCallback = std::function<void(bool connected)>;
-
-  explicit WebrtcConnection(const webrtc::PeerConnectionInterface::RTCConfiguration& config);
+  uint64_t Id() {
+    return id_;
+  }
 
   void SetLocalDescription(std::unique_ptr<webrtc::SessionDescriptionInterface> desc);
 
@@ -33,20 +30,6 @@ public:
   void CreateOffer(const webrtc::PeerConnectionInterface::RTCOfferAnswerOptions& options);
 
   void CreateAnswer(const webrtc::PeerConnectionInterface::RTCOfferAnswerOptions& options);
-
-  void SetSdpCreateSuccessCallback(OnSdpCreateSuccessCallback callback);
-
-  void SetIceCandidateCallback(OnIceCandidateCallback callback);
-
-  void SetPeerConnectionConnectCallback(OnPeerConnectCallback callback);
-
-  /// TODO: add AttachVideoRenders(多个 render) and AttachAudioRender
-
-
-  /// sdp observer
-  void OnSuccess(webrtc::SessionDescriptionInterface* desc) override;
-
-  void OnFailure(webrtc::RTCError error) override;
 
   /// pc observer
   void OnSignalingChange(webrtc::PeerConnectionInterface::SignalingState new_state) override;
@@ -73,16 +56,14 @@ public:
 
   void OnRemoveTrack(rtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) override;
 
-  /// TODO: only for test
-  rtc::scoped_refptr<webrtc::PeerConnectionInterface> PeerConnection();
+private:
+  friend class CreateSdpObserver;
 
 private:
+  uint64_t id_;
+  WebrtcPeerConnectionObserver* webrtc_observer_;
   webrtc::PeerConnectionInterface::RTCConfiguration rtc_config_;
   rtc::scoped_refptr<webrtc::PeerConnectionInterface> pc_;
-
-  OnSdpCreateSuccessCallback sdp_create_success_callback_;
-  OnIceCandidateCallback ice_candidate_callback_;
-  OnPeerConnectCallback peer_connect_callback_;
 };
 
 }

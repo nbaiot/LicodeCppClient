@@ -4,7 +4,6 @@
 
 #include "webrtc_connection.h"
 #include "webrtc_wrapper.h"
-#include "video_render.h"
 
 #include <glog/logging.h>
 
@@ -37,8 +36,33 @@ private:
   bool remote_;
 };
 
-WebrtcConnection::WebrtcConnection(const webrtc::PeerConnectionInterface::RTCConfiguration& config)
-    : rtc_config_(config) {
+class CreateSdpObserver : public webrtc::CreateSessionDescriptionObserver {
+public:
+  explicit CreateSdpObserver(WebrtcConnection* peer) : peer_(peer) {}
+
+  void OnSuccess(webrtc::SessionDescriptionInterface* desc) override {
+    std::string out;
+    desc->ToString(&out);
+    LOG(INFO) << ">>>>>>WebrtcConnection OnSuccess:" << desc->type() << "\n" << out;
+    if (peer_ && peer_->webrtc_observer_) {
+      peer_->webrtc_observer_->OnSdpCreateSuccess(peer_, desc->GetType(), out);
+    }
+  }
+
+  void OnFailure(webrtc::RTCError error) override {
+    LOG(ERROR) << ">>>>>>WebrtcConnection OnFailure:" << error.message();
+    if (peer_ && peer_->webrtc_observer_) {
+      peer_->webrtc_observer_->OnSdpCreateFailure(peer_, error);
+    }
+  }
+
+private:
+  WebrtcConnection* peer_;
+};
+
+WebrtcConnection::WebrtcConnection(uint64_t id, WebrtcPeerConnectionObserver* observer,
+                                   const webrtc::PeerConnectionInterface::RTCConfiguration& config)
+    : id_(id), webrtc_observer_(observer), rtc_config_(config) {
   auto pcFactory = WebrtcWrapper::Instance()->CreatePCFactory();
   pc_ = pcFactory->CreatePeerConnection(config, nullptr, nullptr, this);
 }
@@ -53,37 +77,12 @@ void WebrtcConnection::SetLocalDescription(std::unique_ptr<webrtc::SessionDescri
 
 void WebrtcConnection::CreateOffer(const webrtc::PeerConnectionInterface::RTCOfferAnswerOptions& options) {
   /// The CreateSessionDescriptionObserver callback will be called when done
-  pc_->CreateAnswer(this, options);
+  pc_->CreateAnswer(new rtc::RefCountedObject<CreateSdpObserver>(this), options);
 }
 
 void WebrtcConnection::CreateAnswer(const webrtc::PeerConnectionInterface::RTCOfferAnswerOptions& options) {
   /// The CreateSessionDescriptionObserver callback will be called when done.
-  pc_->CreateAnswer(this, options);
-}
-
-void WebrtcConnection::SetSdpCreateSuccessCallback(WebrtcConnection::OnSdpCreateSuccessCallback callback) {
-  sdp_create_success_callback_ = std::move(callback);
-}
-
-void WebrtcConnection::SetIceCandidateCallback(WebrtcConnection::OnIceCandidateCallback callback) {
-  ice_candidate_callback_ = std::move(callback);
-}
-
-void WebrtcConnection::SetPeerConnectionConnectCallback(WebrtcConnection::OnPeerConnectCallback callback) {
-  peer_connect_callback_ = std::move(callback);
-}
-
-void WebrtcConnection::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
-  std::string out;
-  desc->ToString(&out);
-  LOG(INFO) << ">>>>>>WebrtcConnection OnSuccess:" << desc->type() << "\n" << out;
-  if (sdp_create_success_callback_) {
-    sdp_create_success_callback_(desc->GetType(), out);
-  }
-}
-
-void WebrtcConnection::OnFailure(webrtc::RTCError error) {
-  LOG(ERROR) << ">>>>>>WebrtcConnection OnFailure:" << error.message();
+  pc_->CreateAnswer(new rtc::RefCountedObject<CreateSdpObserver>(this), options);
 }
 
 void WebrtcConnection::OnSignalingChange(webrtc::PeerConnectionInterface::SignalingState new_state) {
@@ -102,8 +101,8 @@ void WebrtcConnection::OnIceCandidate(const webrtc::IceCandidateInterface* candi
   std::string out;
   candidate->ToString(&out);
   LOG(INFO) << ">>>>>>WebrtcConnection OnIceCandidate:" << out;
-  if (ice_candidate_callback_) {
-    ice_candidate_callback_(candidate);
+  if (webrtc_observer_) {
+    webrtc_observer_->OnIceCandidate(this, candidate);
   }
 }
 
@@ -126,8 +125,11 @@ void WebrtcConnection::OnConnectionChange(webrtc::PeerConnectionInterface::PeerC
     connected = false;
   }
 
-  if (connected.has_value() && peer_connect_callback_) {
-    peer_connect_callback_(connected.value());
+  if (connected.has_value() && webrtc_observer_) {
+    if (connected)
+      webrtc_observer_->OnPeerConnect(this);
+    else
+      webrtc_observer_->OnPeerDisconnect(this);
   }
 }
 
@@ -141,10 +143,16 @@ void WebrtcConnection::OnAddTrack(rtc::scoped_refptr<webrtc::RtpReceiverInterfac
             << "media type:" << receiver->media_type() << "\n"
             << "track id:" << receiver->track()->id() << "\n"
             << "track kind:" << receiver->track()->kind() << "\n";
-  /// TODO: fixme
   if (receiver->track()->kind() == webrtc::MediaStreamTrackInterface::kVideoKind) {
     auto* video_track = static_cast<webrtc::VideoTrackInterface*>(receiver->track().get());
-    video_track->AddOrUpdateSink(new VideoRender(), rtc::VideoSinkWants());
+    if (webrtc_observer_) {
+      webrtc_observer_->OnAddRemoteVideoTrack(this, video_track);
+    }
+  } else if (receiver->track()->kind() == webrtc::MediaStreamTrackInterface::kAudioKind) {
+    auto* audio_track = static_cast<webrtc::AudioTrackInterface*>(receiver->track().get());
+    if (webrtc_observer_) {
+      webrtc_observer_->OnAddRemoteAudioTrack(this, audio_track);
+    }
   }
 }
 
@@ -158,10 +166,17 @@ void WebrtcConnection::OnRemoveTrack(rtc::scoped_refptr<webrtc::RtpReceiverInter
             << "media type:" << receiver->media_type() << "\n"
             << "track id:" << receiver->track()->id() << "\n"
             << "track kind:" << receiver->track()->kind() << "\n";
-}
-
-rtc::scoped_refptr<webrtc::PeerConnectionInterface> WebrtcConnection::PeerConnection() {
-  return pc_;
+  if (receiver->track()->kind() == webrtc::MediaStreamTrackInterface::kVideoKind) {
+    auto* video_track = static_cast<webrtc::VideoTrackInterface*>(receiver->track().get());
+    if (webrtc_observer_) {
+      webrtc_observer_->OnRemoveRemoteVideoTrack(this, video_track);
+    }
+  } else if (receiver->track()->kind() == webrtc::MediaStreamTrackInterface::kAudioKind) {
+    auto* audio_track = static_cast<webrtc::AudioTrackInterface*>(receiver->track().get());
+    if (webrtc_observer_) {
+      webrtc_observer_->OnRemoveRemoteAudioTrack(this, audio_track);
+    }
+  }
 }
 
 }

@@ -18,13 +18,15 @@
 #include "ice_server.h"
 #include "webrtc_connection.h"
 
+
 namespace nbaiot {
 
 class Worker;
 
 class LicodeSignaling;
 
-class LicodeRoom : public std::enable_shared_from_this<LicodeRoom> {
+class LicodeRoom : public std::enable_shared_from_this<LicodeRoom>,
+                   public WebrtcPeerConnectionObserver {
 
 public:
   enum State {
@@ -65,6 +67,25 @@ public:
   void StopRecordingStream();
 
   void GetStreamsByAttribute();
+
+  /// webrtc connection callback
+  void OnSdpCreateSuccess(WebrtcConnection* peer, webrtc::SdpType type, const std::string& sdp) override;
+
+  void OnIceCandidate(WebrtcConnection* peer, const webrtc::IceCandidateInterface* candidate) override;
+
+  void OnPeerConnect(WebrtcConnection* peer) override;
+
+  void OnPeerDisconnect(WebrtcConnection* peer) override;
+
+  void OnAddRemoteVideoTrack(WebrtcConnection* peer, webrtc::VideoTrackInterface* video) override;
+
+  void OnRemoveRemoteVideoTrack(WebrtcConnection* peer, webrtc::VideoTrackInterface* video) override;
+
+  void OnAddRemoteAudioTrack(WebrtcConnection* peer, webrtc::AudioTrackInterface* audio) override;
+
+  void OnRemoveRemoteAudioTrack(WebrtcConnection* peer, webrtc::AudioTrackInterface* audio) override;
+
+  void OnDataChannel(WebrtcConnection* peer, webrtc::DataChannelInterface* dataChannel) override;
 
 private:
   void Update(State state);
@@ -108,9 +129,9 @@ private:
   std::shared_ptr<Worker> worker_;
   std::vector<IceServer> ice_server_list_;
 
-  /// TODO: map must be operation at worker thread
+  /// must be operation at worker thread
   std::unordered_map<uint64_t, std::shared_ptr<LicodeStreamInfo>> stream_infos_;
-  std::unordered_map<uint64_t, rtc::scoped_refptr<rtc::RefCountedObject<WebrtcConnection>>> peer_connections_;
+  std::unordered_map<uint64_t, std::unique_ptr<WebrtcConnection>> peer_connections_;
   std::queue<uint64_t> pending_subscribe_streams_;
 
 
