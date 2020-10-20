@@ -15,6 +15,7 @@
 
 #include "licode_token.h"
 #include "licode_stream_info.h"
+#include "licode_room_observer.h"
 #include "ice_server.h"
 #include "webrtc_connection.h"
 
@@ -57,6 +58,25 @@ public:
   void SubscribeStream(uint64_t streamId);
 
   void UnSubscriberStream(uint64_t streamId);
+
+  void SendAnswer(const std::string& connId, const std::string& sdp);
+
+  void SendOffer(const std::string& connId, const std::string& sdp);
+
+  void SendIceCandidate(const std::string& connId,
+                        const std::string& sdpMid, int sdpMLineIndex, const std::string& candidate);
+
+  std::vector<IceServer> IceServers();
+
+  std::string RoomId();
+
+  bool P2p();
+
+  bool SinglePC();
+
+  int DefaultVideoBW();
+
+  int MaxVideoBW();
 
   void LocalStreams();
 
