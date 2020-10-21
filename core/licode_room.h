@@ -15,9 +15,7 @@
 
 #include "licode_token.h"
 #include "licode_stream_info.h"
-#include "licode_room_observer.h"
 #include "ice_server.h"
-#include "webrtc_connection.h"
 
 
 namespace nbaiot {
@@ -26,8 +24,9 @@ class Worker;
 
 class LicodeSignaling;
 
-class LicodeRoom : public std::enable_shared_from_this<LicodeRoom>,
-                   public WebrtcPeerConnectionObserver {
+class LicodeRoomObserver;
+
+class LicodeRoom : public std::enable_shared_from_this<LicodeRoom> {
 
 public:
   enum State {
@@ -36,11 +35,9 @@ public:
     kConnected,
   };
 
-  using OnJoinRoomCallback = std::function<void()>;
+  LicodeRoom(std::shared_ptr<Worker> worker, LicodeToken token, LicodeRoomObserver* observer);
 
-  explicit LicodeRoom(std::shared_ptr<Worker> worker, LicodeToken token);
-
-  ~LicodeRoom() override;
+  ~LicodeRoom();
 
   std::string Id();
 
@@ -59,11 +56,11 @@ public:
 
   void UnSubscriberStream(uint64_t streamId);
 
-  void SendAnswer(const std::string& connId, const std::string& sdp);
+  void SendAnswer(uint64_t streamId, const std::string& sdp);
 
-  void SendOffer(const std::string& connId, const std::string& sdp);
+  void SendOffer(uint64_t streamId, const std::string& sdp);
 
-  void SendIceCandidate(const std::string& connId,
+  void SendIceCandidate(uint64_t streamId,
                         const std::string& sdpMid, int sdpMLineIndex, const std::string& candidate);
 
   std::vector<IceServer> IceServers();
@@ -88,24 +85,6 @@ public:
 
   void GetStreamsByAttribute();
 
-  /// webrtc connection callback
-  void OnSdpCreateSuccess(WebrtcConnection* peer, webrtc::SdpType type, const std::string& sdp) override;
-
-  void OnIceCandidate(WebrtcConnection* peer, const webrtc::IceCandidateInterface* candidate) override;
-
-  void OnPeerConnect(WebrtcConnection* peer) override;
-
-  void OnPeerDisconnect(WebrtcConnection* peer) override;
-
-  void OnAddRemoteVideoTrack(WebrtcConnection* peer, webrtc::VideoTrackInterface* video) override;
-
-  void OnRemoveRemoteVideoTrack(WebrtcConnection* peer, webrtc::VideoTrackInterface* video) override;
-
-  void OnAddRemoteAudioTrack(WebrtcConnection* peer, webrtc::AudioTrackInterface* audio) override;
-
-  void OnRemoveRemoteAudioTrack(WebrtcConnection* peer, webrtc::AudioTrackInterface* audio) override;
-
-  void OnDataChannel(WebrtcConnection* peer, webrtc::DataChannelInterface* dataChannel) override;
 
 private:
   void Update(State state);
@@ -132,8 +111,6 @@ private:
 
   void receiveAnswer(const std::string& connId, const std::string& sdp);
 
-  void CreatePeerConnection(uint64_t streamId);
-
   std::function<void()> SafeTask(const std::function<void(std::shared_ptr<LicodeRoom>)>& function);
 
 private:
@@ -148,17 +125,16 @@ private:
   int max_video_bw_;
   std::shared_ptr<Worker> worker_;
   std::vector<IceServer> ice_server_list_;
-
+  LicodeRoomObserver* observer_;
   /// must be operation at worker thread
   std::unordered_map<uint64_t, std::shared_ptr<LicodeStreamInfo>> local_stream_infos_;
   std::unordered_map<uint64_t, std::shared_ptr<LicodeStreamInfo>> remote_stream_infos_;
-  std::unordered_map<uint64_t, std::unique_ptr<WebrtcConnection>> peer_connections_;
   std::queue<uint64_t> pending_subscribe_streams_;
   std::queue<std::shared_ptr<LicodeStreamInfo>> pending_publish_local_streams_;
 
 
   std::unique_ptr<LicodeSignaling> signaling_;
-  OnJoinRoomCallback join_room_callback_;
+
 
 };
 

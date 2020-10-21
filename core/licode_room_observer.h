@@ -21,15 +21,19 @@ public:
 
   virtual void OnLeaveRoom(const std::string& roomId) = 0;
 
-  virtual void OnRemoteAddStream(const std::shared_ptr<LicodeStreamInfo>& info) = 0;
+  virtual void OnAddRemoteStream(const std::shared_ptr<LicodeStreamInfo>& info) = 0;
 
-  virtual void OnRemoteRemoveStream(const std::shared_ptr<LicodeStreamInfo>& info) = 0;
+  virtual void OnRemoveRemoteStream(const std::shared_ptr<LicodeStreamInfo>& info) = 0;
 
   virtual void OnSubscribeStreamAllocateConnId(const std::shared_ptr<LicodeStreamInfo>& info) = 0;
 
-  virtual void OnSubscribeStreamConnectReady(const std::shared_ptr<LicodeStreamInfo>& info) = 0;
-
   virtual void OnPublishStreamAllocateConnId(const std::shared_ptr<LicodeStreamInfo>& info) = 0;
+
+  virtual void OnStreamConnectReady(const std::shared_ptr<LicodeStreamInfo>& info) = 0;
+
+  virtual void OnReceiveOffer(const std::shared_ptr<LicodeStreamInfo>& info, const std::string& sdp) = 0;
+
+  virtual void OnReceiveAnswer(const std::shared_ptr<LicodeStreamInfo>& info, const std::string& sdp) = 0;
 };
 
 }
